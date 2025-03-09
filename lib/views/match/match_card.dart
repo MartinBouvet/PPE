@@ -1,4 +1,4 @@
-// lib/widgets/match/match_card.dart
+// lib/views/match/match_card.dart
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_model.dart';
@@ -34,17 +34,16 @@ class MatchCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                child:
-                    user.photo != null
-                        ? Image.network(user.photo!, fit: BoxFit.cover)
-                        : Container(
-                          color: Colors.blue.shade100,
-                          child: Icon(
-                            Icons.person,
-                            size: 120,
-                            color: Colors.blue.shade800,
-                          ),
+                child: user.photo != null
+                    ? Image.network(user.photo!, fit: BoxFit.cover)
+                    : Container(
+                        color: Colors.blue.shade100,
+                        child: Icon(
+                          Icons.person,
+                          size: 120,
+                          color: Colors.blue.shade800,
                         ),
+                      ),
               ),
             ),
 
@@ -59,7 +58,7 @@ class MatchCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '@${user.pseudo}',
+                          '@${user.pseudo ?? "Utilisateur"}',
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -108,7 +107,7 @@ class MatchCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            child: const Text('Passe'),
+                            child: const Text('Passer'),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -122,7 +121,7 @@ class MatchCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            child: const Text('Proposer de devenir partenaire'),
+                            child: const Text('Proposer'),
                           ),
                         ),
                       ],

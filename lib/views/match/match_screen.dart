@@ -6,7 +6,7 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../repositories/match_repository.dart';
-import '../../widgets/match/match_card.dart';
+import '../match/match_card.dart'; // Correction du chemin d'importation
 
 class MatchScreen extends StatefulWidget {
   const MatchScreen({Key? key}) : super(key: key);

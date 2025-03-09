@@ -17,35 +17,46 @@ class AppRouter {
 
   // Vérification de l'état d'authentification
   static Future<String> _checkAuthState() async {
-    final user = await _authRepository.getCurrentUser();
-    return user != null ? '/' : '/welcome';
+    try {
+      final user = await _authRepository.getCurrentUser();
+      return user != null ? '/' : '/welcome';
+    } catch (e) {
+      debugPrint(
+          'Erreur lors de la vérification de l\'état d\'authentification: $e');
+      return '/welcome';
+    }
   }
 
   static final GoRouter router = GoRouter(
     initialLocation: '/', // Sera redirigé selon l'état d'authentification
     redirect: (BuildContext context, GoRouterState state) async {
-      // Vérification de l'authentification à l'initialisation
-      if (state.matchedLocation == '/') {
-        final destination = await _checkAuthState();
-        return destination;
-      }
+      try {
+        // Vérification de l'authentification à l'initialisation
+        if (state.matchedLocation == '/') {
+          final destination = await _checkAuthState();
+          return destination;
+        }
 
-      // Si l'utilisateur n'est pas connecté et essaie d'accéder à des routes protégées
-      final user = await _authRepository.getCurrentUser();
-      final loggingIn = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/signup' ||
-          state.matchedLocation == '/welcome';
+        // Si l'utilisateur n'est pas connecté et essaie d'accéder à des routes protégées
+        final user = await _authRepository.getCurrentUser();
+        final loggingIn = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/signup' ||
+            state.matchedLocation == '/welcome';
 
-      if (user == null && !loggingIn) {
+        if (user == null && !loggingIn) {
+          return '/welcome';
+        }
+
+        // Si l'utilisateur est connecté et essaie d'accéder aux routes d'authentification
+        if (user != null && loggingIn) {
+          return '/';
+        }
+
+        return null; // Pas de redirection
+      } catch (e) {
+        debugPrint('Erreur lors de la redirection: $e');
         return '/welcome';
       }
-
-      // Si l'utilisateur est connecté et essaie d'accéder aux routes d'authentification
-      if (user != null && loggingIn) {
-        return '/';
-      }
-
-      return null; // Pas de redirection
     },
     routes: [
       // Route initiale qui redirige vers welcome ou home
@@ -76,8 +87,8 @@ class AppRouter {
       GoRoute(
         path: '/profile/edit',
         builder: (context, state) {
-          final user = state.extra as UserModel;
-          return EditProfileScreen(user: user);
+          final user = state.extra as UserModel?;
+          return EditProfileScreen(user: user ?? UserModel(id: ''));
         },
       ),
       GoRoute(
@@ -93,8 +104,7 @@ class AppRouter {
       GoRoute(
         path: '/conversation/:id',
         builder: (context, state) {
-          final conversationId = state.pathParameters['id']!;
-          // Dans les nouvelles versions de go_router, les paramètres de requête sont accessibles autrement
+          final conversationId = state.pathParameters['id'] ?? '';
           final otherUserPseudo =
               state.uri.queryParameters['otherUserPseudo'] ?? 'Utilisateur';
           return ConversationScreen(

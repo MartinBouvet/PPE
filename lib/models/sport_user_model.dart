@@ -23,4 +23,31 @@ class SportUserModel {
       lookingForPartners: json['looking_for_partners'] ?? false,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id_user': userId,
+      'id_sport': sportId,
+      'club_name': clubName,
+      'skill_level': skillLevel,
+      'looking_for_partners': lookingForPartners,
+    };
+  }
+
+  // Créer une copie avec des modifications
+  SportUserModel copyWith({
+    String? userId,
+    int? sportId,
+    String? clubName,
+    String? skillLevel,
+    bool? lookingForPartners,
+  }) {
+    return SportUserModel(
+      userId: userId ?? this.userId,
+      sportId: sportId ?? this.sportId,
+      clubName: clubName ?? this.clubName,
+      skillLevel: skillLevel ?? this.skillLevel,
+      lookingForPartners: lookingForPartners ?? this.lookingForPartners,
+    );
+  }
 }
