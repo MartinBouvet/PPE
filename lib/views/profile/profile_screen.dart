@@ -1,4 +1,3 @@
-// lib/views/profile/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
@@ -7,9 +6,8 @@ import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
-import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
-import 'add_sport_screen.dart';
+import 'sport_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -74,7 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _authRepository.signOut();
 
       if (mounted) {
-        context.go('/login');
+        context.go('/welcome');
       }
     } catch (e) {
       if (mounted) {
@@ -87,14 +85,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _navigateToSportSelection() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SportSelectionScreen(),
+      ),
+    );
+
+    if (result == true) {
+      // Si des modifications ont été faites, recharger les données
+      _loadUserData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mon Profil')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_user == null) {
       return Scaffold(
+        appBar: AppBar(title: const Text('Mon Profil')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -120,7 +136,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
-              final result = await context.push('/profile/edit', extra: _user);
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(user: _user!),
+                ),
+              );
               if (result == true) {
                 _loadUserData();
               }
@@ -176,6 +197,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         fit: BoxFit.cover,
                                       )
                                     : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: _user!.photo == null
                                   ? Icon(
@@ -237,15 +265,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           TextButton.icon(
-                            onPressed: () async {
-                              final result =
-                                  await context.push('/profile/add_sport');
-                              if (result == true) {
-                                _loadUserData();
-                              }
-                            },
+                            onPressed: _navigateToSportSelection,
                             icon: const Icon(Icons.add),
-                            label: const Text('Ajouter'),
+                            label: const Text('Gérer'),
                           ),
                         ],
                       ),
@@ -271,13 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     ElevatedButton.icon(
-                                      onPressed: () async {
-                                        final result = await context
-                                            .push('/profile/add_sport');
-                                        if (result == true) {
-                                          _loadUserData();
-                                        }
-                                      },
+                                      onPressed: _navigateToSportSelection,
                                       icon: const Icon(Icons.add),
                                       label: const Text('Ajouter un sport'),
                                     ),
@@ -308,13 +324,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(
-                                              sport?.name ??
-                                                  'Sport #${sportUser.sportId}',
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 16,
+                                                  backgroundColor:
+                                                      Theme.of(context)
+                                                          .primaryColor
+                                                          .withOpacity(0.2),
+                                                  child: Icon(
+                                                    Icons.sports,
+                                                    size: 18,
+                                                    color: Theme.of(context)
+                                                        .primaryColor,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  sport?.name ??
+                                                      'Sport #${sportUser.sportId}',
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                             if (sportUser.lookingForPartners)
                                               Chip(
@@ -325,6 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 labelStyle: TextStyle(
                                                   color: Colors.green.shade800,
                                                   fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
                                                 ),
                                               ),
                                           ],
@@ -365,21 +400,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
 
                       const SizedBox(height: 32),
+
+                      // Autres sections (statistiques, matchs, etc.)
+                      const Text(
+                        'Statistiques',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildStatItem(context, 'Matchs', '5'),
+                                  _buildStatItem(context, 'Partenaires', '3'),
+                                  _buildStatItem(context, 'Réservations', '2'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Section paramètres
+                      const Text(
+                        'Paramètres',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.notifications),
+                              title: const Text('Notifications'),
+                              trailing: Switch(
+                                value: true,
+                                onChanged: (value) {},
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.language),
+                              title: const Text('Langue'),
+                              trailing: const Text('Français'),
+                              onTap: () {},
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.privacy_tip),
+                              title: const Text('Confidentialité'),
+                              onTap: () {},
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.help_outline),
+                              title: const Text('Aide et support'),
+                              onTap: () {},
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(
+                          height: 60), // Espace en bas pour le scroll
                     ],
                   ),
                 ),
               ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await context.push('/profile/add_sport');
-          if (result == true) {
-            _loadUserData();
-          }
-        },
-        child: const Icon(Icons.add),
-        tooltip: 'Ajouter un sport',
+        onPressed: _navigateToSportSelection,
+        child: const Icon(Icons.sports),
+        tooltip: 'Gérer mes sports',
       ),
+    );
+  }
+
+  Widget _buildStatItem(BuildContext context, String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
     );
   }
 }

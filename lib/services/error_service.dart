@@ -52,7 +52,7 @@ class ErrorService {
 
     // Si aucune correspondance spécifique, retourner un message générique
     // En mode debug, on inclut l'erreur originale pour faciliter le débogage
-    return kDebugMode
+    return kDebugMod
         ? 'Une erreur est survenue: $errorStr'
         : 'Une erreur est survenue. Veuillez réessayer.';
   }

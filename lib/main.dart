@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/app_router.dart';
 import 'config/theme.dart';
 import 'config/supabase_config.dart';
@@ -56,14 +57,16 @@ class MyApp extends StatelessWidget {
       },
       // Localisation pour les formats de date, etc.
       localizationsDelegates: const [
-        // GlobalMaterialLocalizations.delegate,
-        // GlobalWidgetsLocalizations.delegate,
-        // GlobalCupertinoLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
         Locale('fr', 'FR'),
         Locale('en', 'US'),
       ],
+      locale: const Locale(
+          'fr', 'FR'), // Définir le français comme langue par défaut
     );
   }
 }
@@ -81,6 +84,16 @@ class ErrorApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
+      locale: const Locale('fr', 'FR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+      ],
       home: Scaffold(
         body: Center(
           child: Padding(

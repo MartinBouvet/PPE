@@ -1,6 +1,7 @@
 // lib/views/home/home_screen.dart
 import 'package:flutter/material.dart';
-import '../match/match_screen.dart';
+import '../discover/discover_screen.dart';
+import '../facility/facility_screen.dart';
 import '../profile/profile_screen.dart';
 import '../chat/chat_screen.dart';
 
@@ -15,9 +16,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const MatchScreen(),
-    const ChatScreen(),
-    const ProfileScreen(),
+    const DiscoverScreen(), // Écran de swipe pour découvrir des sportifs
+    const FacilityScreen(), // Écran de recherche d'installations sportives
+    const ChatScreen(), // Écran de messages
+    const ProfileScreen(), // Écran de profil
   ];
 
   @override
@@ -31,10 +33,15 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
           });
         },
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.sports_tennis),
-            label: 'Matchs',
+            icon: Icon(Icons.explore),
+            label: 'Découvrir',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on),
+            label: 'Lieux',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Messages'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
