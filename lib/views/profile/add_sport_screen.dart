@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../config/supabase_config.dart';
 
 class AddSportScreen extends StatefulWidget {
   const AddSportScreen({Key? key}) : super(key: key);
@@ -67,8 +68,7 @@ class _AddSportScreenState extends State<AddSportScreen> {
   Future<void> _saveSport() async {
     if (!_formKey.currentState!.validate() ||
         _userId == null ||
-        _selectedSport == null)
-      return;
+        _selectedSport == null) return;
 
     setState(() {
       _isSaving = true;
@@ -86,7 +86,7 @@ class _AddSportScreenState extends State<AddSportScreen> {
       }
 
       // Ajouter le sport à l'utilisateur
-      await _supabase.from('sport_user').insert({
+      await SupabaseConfig.client.from('sport_user').insert({
         'id_user': _userId,
         'id_sport': _selectedSport!.id,
         'club_name': _clubNameController.text.trim(),
@@ -149,13 +149,12 @@ class _AddSportScreenState extends State<AddSportScreen> {
               DropdownButtonFormField<SportModel>(
                 value: _selectedSport,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
-                items:
-                    _allSports.map((sport) {
-                      return DropdownMenuItem<SportModel>(
-                        value: sport,
-                        child: Text(sport.name),
-                      );
-                    }).toList(),
+                items: _allSports.map((sport) {
+                  return DropdownMenuItem<SportModel>(
+                    value: sport,
+                    child: Text(sport.name),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   setState(() {
                     _selectedSport = value;
@@ -168,15 +167,12 @@ class _AddSportScreenState extends State<AddSportScreen> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 16),
-
               const Text(
                 'Informations complémentaires',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-
               TextFormField(
                 controller: _clubNameController,
                 decoration: const InputDecoration(
@@ -184,9 +180,7 @@ class _AddSportScreenState extends State<AddSportScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _skillLevelController,
                 decoration: const InputDecoration(
@@ -195,9 +189,7 @@ class _AddSportScreenState extends State<AddSportScreen> {
                   hintText: 'Ex: Débutant, Intermédiaire, Avancé',
                 ),
               ),
-
               const SizedBox(height: 16),
-
               SwitchListTile(
                 title: const Text('Je recherche des partenaires'),
                 value: _lookingForPartners,

@@ -1,11 +1,15 @@
 // lib/views/profile/profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_user_model.dart';
+import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../repositories/sport_repository.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_screen.dart';
+import 'add_sport_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -17,10 +21,13 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authRepository = AuthRepository();
   final _userRepository = UserRepository();
+  final _sportRepository = SportRepository();
 
   UserModel? _user;
   List<SportUserModel> _userSports = [];
+  Map<int, SportModel> _sportsMap = {};
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -31,18 +38,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUserData() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
       _user = await _authRepository.getCurrentUser();
 
       if (_user != null) {
+        // Charger les sports de l'utilisateur
         _userSports = await _userRepository.getUserSports(_user!.id);
+
+        // Charger les détails des sports
+        for (var sportUser in _userSports) {
+          final sport = await _sportRepository.getSportById(sportUser.sportId);
+          if (sport != null) {
+            setState(() {
+              _sportsMap[sport.id] = sport;
+            });
+          }
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
+      setState(() {
+        _errorMessage = 'Erreur lors du chargement du profil: ${e.toString()}';
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -55,10 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _authRepository.signOut();
 
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
+        context.go('/login');
       }
     } catch (e) {
       if (mounted) {
@@ -87,9 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
+                  context.go('/login');
                 },
                 child: const Text('Se connecter'),
               ),
@@ -106,12 +120,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => EditProfileScreen(user: _user!),
-                ),
-              );
-              _loadUserData(); // Rafraîchir les données après modification
+              final result = await context.push('/profile/edit', extra: _user);
+              if (result == true) {
+                _loadUserData();
+              }
             },
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
@@ -119,131 +131,254 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadUserData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // En-tête du profil avec photo
-                Center(
+        child: _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          shape: BoxShape.circle,
-                          image:
-                              _user!.photo != null
-                                  ? DecorationImage(
-                                    image: NetworkImage(_user!.photo!),
-                                    fit: BoxFit.cover,
-                                  )
-                                  : null,
-                        ),
-                        child:
-                            _user!.photo == null
-                                ? Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Colors.blue.shade800,
-                                )
-                                : null,
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        '@${_user!.pseudo}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      ElevatedButton.icon(
+                        onPressed: _loadUserData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Réessayer'),
                       ),
-                      if (_user!.firstName != null)
-                        Text(
-                          _user!.firstName!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                // Description
-                if (_user!.description != null) ...[
-                  const Text(
-                    'À propos',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(_user!.description!),
-                  const SizedBox(height: 24),
-                ],
-
-                // Sports
-                const Text(
-                  'Mes sports',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                _userSports.isEmpty
-                    ? const Text('Aucun sport ajouté')
-                    : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _userSports.length,
-                      itemBuilder: (context, index) {
-                        final sportUser = _userSports[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(sportUser.sportId.toString()),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (sportUser.clubName != null)
-                                  Text('Club: ${sportUser.clubName}'),
-                                if (sportUser.skillLevel != null)
-                                  Text('Niveau: ${sportUser.skillLevel}'),
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (sportUser.clubName != null)
-                                  Text('Club: ${sportUser.clubName}'),
-                                if (sportUser.skillLevel != null)
-                                  Text('Niveau: ${sportUser.skillLevel}'),
-                              ],
-                            ),
-                            trailing:
-                                sportUser.lookingForPartners
-                                    ? Chip(
-                                      label: const Text('Recherche partenaire'),
-                                      backgroundColor: Colors.green.shade100,
-                                    )
+              )
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // En-tête du profil avec photo
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade100,
+                                shape: BoxShape.circle,
+                                image: _user!.photo != null
+                                    ? DecorationImage(
+                                        image: NetworkImage(_user!.photo!),
+                                        fit: BoxFit.cover,
+                                      )
                                     : null,
+                              ),
+                              child: _user!.photo == null
+                                  ? Icon(
+                                      Icons.person,
+                                      size: 60,
+                                      color: Colors.blue.shade800,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '@${_user!.pseudo ?? "Sans pseudo"}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_user!.firstName != null)
+                              Text(
+                                _user!.firstName!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Description
+                      if (_user!.description != null &&
+                          _user!.description!.isNotEmpty) ...[
+                        const Text(
+                          'À propos',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        );
-                      },
-                    ),
-              ],
-            ),
-          ),
-        ),
+                          child: Text(_user!.description!),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Sports
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Mes sports',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final result =
+                                  await context.push('/profile/add_sport');
+                              if (result == true) {
+                                _loadUserData();
+                              }
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Ajouter'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _userSports.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  children: [
+                                    const Icon(
+                                      Icons.sports,
+                                      size: 48,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Aucun sport ajouté',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final result = await context
+                                            .push('/profile/add_sport');
+                                        if (result == true) {
+                                          _loadUserData();
+                                        }
+                                      },
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Ajouter un sport'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _userSports.length,
+                              itemBuilder: (context, index) {
+                                final sportUser = _userSports[index];
+                                final sport = _sportsMap[sportUser.sportId];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              sport?.name ??
+                                                  'Sport #${sportUser.sportId}',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (sportUser.lookingForPartners)
+                                              Chip(
+                                                label: const Text(
+                                                    'Recherche partenaire'),
+                                                backgroundColor:
+                                                    Colors.green.shade100,
+                                                labelStyle: TextStyle(
+                                                  color: Colors.green.shade800,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (sportUser.clubName != null &&
+                                            sportUser.clubName!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 4),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.business,
+                                                    size: 16,
+                                                    color: Colors.grey),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                    'Club: ${sportUser.clubName}'),
+                                              ],
+                                            ),
+                                          ),
+                                        if (sportUser.skillLevel != null &&
+                                            sportUser.skillLevel!.isNotEmpty)
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.trending_up,
+                                                  size: 16, color: Colors.grey),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                  'Niveau: ${sportUser.skillLevel}'),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Naviguer vers l'écran d'ajout de sport
-          // TODO: Implémenter l'écran d'ajout de sport
+        onPressed: () async {
+          final result = await context.push('/profile/add_sport');
+          if (result == true) {
+            _loadUserData();
+          }
         },
         child: const Icon(Icons.add),
+        tooltip: 'Ajouter un sport',
       ),
     );
   }

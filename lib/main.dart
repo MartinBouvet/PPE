@@ -1,15 +1,21 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart' as dotenv;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/app_router.dart';
+import 'config/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialiser Supabase
+  // Chargement des variables d'environnement
+  await dotenv.load(fileName: ".env");
+
+  // Initialisation de Supabase
   await Supabase.initialize(
-    url: 'https://aaygogjvrgskhmlgymik.supabase.co',
-    anonKey:
+    url: dotenv.env['SUPABASE_URL'] ??
+        'https://aaygogjvrgskhmlgymik.supabase.co',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ??
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFheWdvZ2p2cmdza2htbGd5bWlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzNjAyNTUsImV4cCI6MjA1NjkzNjI1NX0.3ea4d79P9z9EMoH3sSaumpibkVFa_MgST27ldlXkZjg',
   );
 
@@ -21,55 +27,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'AKOS',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF3B82F6),
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3B82F6)),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AKOS'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Bienvenue sur AKOS',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Application en cours de développement',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Connexion à Supabase établie avec succès!'),
-                  ),
-                );
-              },
-              child: const Text('Test de connexion'),
-            ),
-          ],
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      routerConfig: AppRouter.router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
