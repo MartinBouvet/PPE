@@ -1,137 +1,72 @@
+// lib/views/profile/profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../models/user_model.dart';
+import '../../models/sport_user_model.dart';
 import '../../models/sport_model.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
+import '../../services/image_service.dart';
+import 'edit_profile_screen.dart';
+import 'sport_selection_screen.dart';
 
-// Modèle pour les installations sportives
-class SportFacility {
-  final String id;
-  final String name;
-  final String address;
-  final double distance; // en km
-  final List<int> sportIds;
-  final String? photoUrl;
-  final double rating;
-  final String? openingHours;
-  final double price; // prix par heure en euros
-
-  SportFacility({
-    required this.id,
-    required this.name,
-    required this.address,
-    required this.distance,
-    required this.sportIds,
-    this.photoUrl,
-    this.rating = 0.0,
-    this.openingHours,
-    this.price = 0.0,
-  });
-}
-
-class FacilityScreen extends StatefulWidget {
-  const FacilityScreen({Key? key}) : super(key: key);
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  _FacilityScreenState createState() => _FacilityScreenState();
+  _ProfileScreenState createState() => _ProfileScreenState();
 }
 
-class _FacilityScreenState extends State<FacilityScreen> {
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _authRepository = AuthRepository();
+  final _userRepository = UserRepository();
   final _sportRepository = SportRepository();
-  List<SportModel> _sports = [];
-  SportModel? _selectedSport;
-  List<SportFacility> _facilities = [];
-  List<SportFacility> _filteredFacilities = [];
+  final _imageService = ImageService();
+
+  UserModel? _user;
+  List<SportUserModel> _userSports = [];
+  Map<int, SportModel> _sportsMap = {};
   bool _isLoading = true;
-  double _maxDistance = 10.0; // 10 km par défaut
-  double _maxPrice = 50.0; // 50€ par défaut
-  bool _isMapView = false; // Vue liste par défaut
+  bool _isUploadingImage = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadUserData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadUserData() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      // Charger les sports
-      _sports = await _sportRepository.getAllSports();
-      if (_sports.isNotEmpty) {
-        _selectedSport = _sports.first;
+      _user = await _authRepository.getCurrentUser();
+
+      if (_user != null) {
+        // Charger les sports de l'utilisateur
+        _userSports = await _userRepository.getUserSports(_user!.id);
+
+        // Charger les détails des sports
+        for (var sportUser in _userSports) {
+          final sport = await _sportRepository.getSportById(sportUser.sportId);
+          if (sport != null) {
+            setState(() {
+              _sportsMap[sport.id] = sport;
+            });
+          }
+        }
       }
-
-      // Données fictives pour les installations sportives
-      _facilities = [
-        SportFacility(
-          id: '1',
-          name: 'Gymnase Jean Moulin',
-          address: '28 Rue des Sports, Paris',
-          distance: 2.3,
-          sportIds: [1, 3, 5], // IDs des sports disponibles
-          photoUrl:
-              'https://images.unsplash.com/photo-1535131749006-b7f58c99034b',
-          rating: 4.5,
-          openingHours: 'Lun-Ven: 8h-22h, Week-end: 10h-18h',
-          price: 15.0,
-        ),
-        SportFacility(
-          id: '2',
-          name: 'Centre sportif du Parc',
-          address: '45 Avenue du Parc, Paris',
-          distance: 3.7,
-          sportIds: [1, 2, 4],
-          photoUrl: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8',
-          rating: 4.2,
-          openingHours: 'Lun-Dim: 9h-21h',
-          price: 20.0,
-        ),
-        SportFacility(
-          id: '3',
-          name: 'Stade Municipal',
-          address: '12 Rue des Athlètes, Paris',
-          distance: 5.1,
-          sportIds: [1, 5, 6],
-          photoUrl:
-              'https://images.unsplash.com/photo-1534710961216-75c88202f43e',
-          rating: 3.8,
-          openingHours: 'Lun-Sam: 10h-20h, Dim: Fermé',
-          price: 12.0,
-        ),
-        SportFacility(
-          id: '4',
-          name: 'Court de Tennis ABC',
-          address: '89 Boulevard des Raquettes, Paris',
-          distance: 1.8,
-          sportIds: [2],
-          photoUrl:
-              'https://images.unsplash.com/photo-1595435934349-5c8a329b5209',
-          rating: 4.7,
-          openingHours: 'Tous les jours: 7h-22h',
-          price: 25.0,
-        ),
-        SportFacility(
-          id: '5',
-          name: 'Piscine Olympique',
-          address: '34 Rue du Plongeon, Paris',
-          distance: 8.2,
-          sportIds: [3],
-          photoUrl:
-              'https://images.unsplash.com/photo-1571902943202-507ec2618e8f',
-          rating: 4.3,
-          openingHours: 'Lun-Ven: 7h-21h, Week-end: 9h-19h',
-          price: 8.0,
-        ),
-      ];
-
-      // Filtrer par défaut avec le premier sport
-      _applyFilters();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors du chargement des données: $e')),
-      );
+      setState(() {
+        _errorMessage = 'Erreur lors du chargement du profil: ${e.toString()}';
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -139,417 +74,536 @@ class _FacilityScreenState extends State<FacilityScreen> {
     }
   }
 
-  void _applyFilters() {
-    if (_selectedSport == null) return;
+  Future<void> _logout() async {
+    try {
+      await _authRepository.signOut();
 
-    setState(() {
-      _filteredFacilities = _facilities.where((facility) {
-        // Filtrer par sport
-        final hasSport = facility.sportIds.contains(_selectedSport!.id);
-
-        // Filtrer par distance
-        final isNearby = facility.distance <= _maxDistance;
-
-        // Filtrer par prix
-        final isAffordable = facility.price <= _maxPrice;
-
-        return hasSport && isNearby && isAffordable;
-      }).toList();
-
-      // Trier par distance
-      _filteredFacilities.sort((a, b) => a.distance.compareTo(b.distance));
-    });
-  }
-
-  void _showFilterDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Filtres',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Filtre de distance
-                  const Text(
-                    'Distance maximale',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: _maxDistance,
-                          min: 1,
-                          max: 20,
-                          divisions: 19,
-                          label: '${_maxDistance.round()} km',
-                          onChanged: (value) {
-                            setModalState(() {
-                              _maxDistance = value;
-                            });
-                          },
-                        ),
-                      ),
-                      Text('${_maxDistance.round()} km'),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Filtre de prix
-                  const Text(
-                    'Budget maximum',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: _maxPrice,
-                          min: 5,
-                          max: 100,
-                          divisions: 19,
-                          label: '${_maxPrice.round()}€',
-                          onChanged: (value) {
-                            setModalState(() {
-                              _maxPrice = value;
-                            });
-                          },
-                        ),
-                      ),
-                      Text('${_maxPrice.round()}€'),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Boutons d'action
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        child: const Text('Annuler'),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _applyFilters();
-                        },
-                        child: const Text('Appliquer'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
+      if (mounted) {
+        context.go('/welcome');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la déconnexion: ${e.toString()}'),
+          ),
         );
-      },
-    );
+      }
+    }
   }
 
-  Widget _buildFacilityCard(SportFacility facility) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 4,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Image
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: facility.photoUrl != null
-                ? Image.network(
-                    facility.photoUrl!,
-                    height: 150,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 150,
-                        color: Colors.grey.shade300,
-                        child: Icon(
-                          Icons.sports,
-                          size: 50,
-                          color: Colors.grey.shade700,
-                        ),
-                      );
-                    },
-                  )
-                : Container(
-                    height: 150,
-                    color: Colors.grey.shade300,
-                    child: Icon(
-                      Icons.sports,
-                      size: 50,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-          ),
+  Future<void> _pickAndUploadImage() async {
+    if (_user == null) return;
 
-          // Contenu
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Nom et distance
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        facility.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${facility.distance} km',
-                        style: TextStyle(
-                          color: Colors.blue.shade800,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
 
-                const SizedBox(height: 4),
+      if (pickedFile == null) return;
 
-                // Adresse
-                Text(
-                  facility.address,
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
+      setState(() {
+        _isUploadingImage = true;
+      });
 
-                const SizedBox(height: 8),
+      final imageFile = File(pickedFile.path);
+      final photoUrl =
+          await _imageService.uploadProfileImage(imageFile, _user!.id);
 
-                // Horaires et évaluation
-                Row(
-                  children: [
-                    Icon(Icons.access_time,
-                        size: 16, color: Colors.grey.shade700),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        facility.openingHours ?? 'Horaires non disponibles',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, size: 16, color: Colors.amber),
-                        Text(
-                          ' ${facility.rating.toStringAsFixed(1)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+      if (photoUrl != null) {
+        // Mettre à jour le profil avec la nouvelle photo
+        await _userRepository.updateUserProfile(_user!.id, {'photo': photoUrl});
 
-                const SizedBox(height: 12),
+        // Recharger les données du profil
+        await _loadUserData();
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${facility.price.toStringAsFixed(0)}€/heure',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Navigation vers l'écran de détail/réservation
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content:
-                                  Text('Réservation pour ${facility.name}')),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text('Réserver'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo de profil mise à jour')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Erreur lors du téléchargement de l\'image: ${e.toString()}')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isUploadingImage = false;
+      });
+    }
+  }
+
+  void _navigateToSportSelection() async {
+    if (_user == null) return;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SportSelectionScreen(userId: _user!.id),
       ),
     );
+
+    if (result == true) {
+      // Si des modifications ont été faites, recharger les données
+      _loadUserData();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Lieux sportifs')),
+        appBar: AppBar(title: const Text('Mon Profil')),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Mon Profil')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Vous n\'êtes pas connecté'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  context.go('/login');
+                },
+                child: const Text('Se connecter'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lieux sportifs'),
+        title: const Text('Mon Profil'),
         actions: [
-          // Bouton pour changer de vue (liste/carte)
           IconButton(
-            icon: Icon(_isMapView ? Icons.list : Icons.map),
-            onPressed: () {
-              setState(() {
-                _isMapView = !_isMapView;
-              });
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditProfileScreen(user: _user!),
+                ),
+              );
+              if (result == true) {
+                _loadUserData();
+              }
             },
-            tooltip: _isMapView ? 'Vue liste' : 'Vue carte',
           ),
-          // Bouton de filtres
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
-            tooltip: 'Filtres',
-          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-      body: Column(
-        children: [
-          // Sélecteur de sport
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: _sports.isEmpty
-                ? const Center(child: Text('Aucun sport disponible'))
-                : ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _sports.length,
-                    itemBuilder: (context, index) {
-                      final sport = _sports[index];
-                      final isSelected = _selectedSport?.id == sport.id;
+      body: RefreshIndicator(
+        onRefresh: _loadUserData,
+        child: _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadUserData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // En-tête du profil avec photo
+                      Center(
+                        child: Column(
+                          children: [
+                            Stack(
+                              children: [
+                                // Photo de profil
+                                _isUploadingImage
+                                    ? const CircleAvatar(
+                                        radius: 60,
+                                        backgroundColor: Colors.grey,
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : GestureDetector(
+                                        onTap: _pickAndUploadImage,
+                                        child: Container(
+                                          width: 120,
+                                          height: 120,
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade100,
+                                            shape: BoxShape.circle,
+                                            image: _user.photo != null
+                                                ? DecorationImage(
+                                                    image:
+                                                        CachedNetworkImageProvider(
+                                                            _user.photo!),
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : null,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.1),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: _user.photo == null
+                                              ? Icon(
+                                                  Icons.person,
+                                                  size: 60,
+                                                  color: Colors.blue.shade800,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                // Bouton pour changer la photo
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).primaryColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: _pickAndUploadImage,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '@${_user.pseudo ?? "Sans pseudo"}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_user.firstName != null)
+                              Text(
+                                _user.firstName!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ChoiceChip(
-                          label: Text(sport.name),
-                          selected: isSelected,
-                          onSelected: (_) {
-                            setState(() {
-                              _selectedSport = sport;
-                            });
-                            _applyFilters();
-                          },
-                          backgroundColor: Colors.grey.shade200,
-                          selectedColor:
-                              Theme.of(context).primaryColor.withOpacity(0.2),
-                          labelStyle: TextStyle(
-                            color: isSelected
-                                ? Theme.of(context).primaryColor
-                                : Colors.black,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                      const SizedBox(height: 24),
+
+                      // Description
+                      if (_user.description != null &&
+                          _user.description!.isNotEmpty) ...[
+                        const Text(
+                          'À propos',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(_user.description!),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Sports
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Mes sports',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          TextButton.icon(
+                            onPressed: _navigateToSportSelection,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Gérer'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _userSports.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  children: [
+                                    const Icon(
+                                      Icons.sports,
+                                      size: 48,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Aucun sport ajouté',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton.icon(
+                                      onPressed: _navigateToSportSelection,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Ajouter un sport'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _userSports.length,
+                              itemBuilder: (context, index) {
+                                final sportUser = _userSports[index];
+                                final sport = _sportsMap[sportUser.sportId];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 16,
+                                                  backgroundColor:
+                                                      Theme.of(context)
+                                                          .primaryColor
+                                                          .withOpacity(0.2),
+                                                  child: Icon(
+                                                    Icons.sports,
+                                                    size: 18,
+                                                    color: Theme.of(context)
+                                                        .primaryColor,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  sport?.name ??
+                                                      'Sport #${sportUser.sportId}',
+                                                  style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (sportUser.lookingForPartners)
+                                              Chip(
+                                                label: const Text(
+                                                    'Recherche partenaire'),
+                                                backgroundColor:
+                                                    Colors.green.shade100,
+                                                labelStyle: TextStyle(
+                                                  color: Colors.green.shade800,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        if (sportUser.clubName != null &&
+                                            sportUser.clubName!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 4),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.business,
+                                                    size: 16,
+                                                    color: Colors.grey),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                    'Club: ${sportUser.clubName}'),
+                                              ],
+                                            ),
+                                          ),
+                                        if (sportUser.skillLevel != null &&
+                                            sportUser.skillLevel!.isNotEmpty)
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.trending_up,
+                                                  size: 16, color: Colors.grey),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                  'Niveau: ${sportUser.skillLevel}'),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+
+                      const SizedBox(height: 32),
+
+                      // Statistiques
+                      const Text(
+                        'Statistiques',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildStatItem(context, 'Sports',
+                                      '${_userSports.length}'),
+                                  _buildStatItem(context, 'Partenaires', '0'),
+                                  _buildStatItem(context, 'Lieux visités', '0'),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
+                      ),
 
-          const Divider(height: 1),
+                      const SizedBox(height: 24),
 
-          // Liste ou carte des installations
-          Expanded(
-            child: _isMapView
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.map, size: 64, color: Colors.grey.shade400),
-                        const Text('Vue carte non disponible dans cette démo'),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _isMapView = false;
-                            });
-                          },
-                          child: const Text('Revenir à la liste'),
+                      // Section paramètres
+                      const Text(
+                        'Paramètres',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
-                    ),
-                  )
-                : _filteredFacilities.isEmpty
-                    ? Center(
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off,
-                                size: 64, color: Colors.grey.shade400),
-                            const Text('Aucun lieu trouvé avec ces critères'),
-                            const SizedBox(height: 20),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _maxDistance = 20.0;
-                                  _maxPrice = 100.0;
-                                });
-                                _applyFilters();
-                              },
-                              child: const Text('Élargir la recherche'),
+                            ListTile(
+                              leading: const Icon(Icons.notifications),
+                              title: const Text('Notifications'),
+                              trailing: Switch(
+                                value: true,
+                                onChanged: (value) {},
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.language),
+                              title: const Text('Langue'),
+                              trailing: const Text('Français'),
+                              onTap: () {},
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.privacy_tip),
+                              title: const Text('Confidentialité'),
+                              onTap: () {},
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.help_outline),
+                              title: const Text('Aide et support'),
+                              onTap: () {},
                             ),
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredFacilities.length,
-                        itemBuilder: (context, index) {
-                          return _buildFacilityCard(_filteredFacilities[index]);
-                        },
                       ),
-          ),
-        ],
+
+                      const SizedBox(height: 60),
+                    ],
+                  ),
+                ),
+              ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToSportSelection,
+        child: const Icon(Icons.sports),
+        tooltip: 'Gérer mes sports',
+      ),
+    );
+  }
+
+  Widget _buildStatItem(BuildContext context, String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
     );
   }
 }

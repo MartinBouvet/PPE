@@ -1,11 +1,16 @@
+// lib/views/profile/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_user_model.dart';
 import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
+import '../../services/image_service.dart';
 import 'edit_profile_screen.dart';
 import 'sport_selection_screen.dart';
 
@@ -20,11 +25,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authRepository = AuthRepository();
   final _userRepository = UserRepository();
   final _sportRepository = SportRepository();
+  final _imageService = ImageService();
 
   UserModel? _user;
   List<SportUserModel> _userSports = [];
   Map<int, SportModel> _sportsMap = {};
   bool _isLoading = true;
+  bool _isUploadingImage = false;
   String? _errorMessage;
 
   @override
@@ -85,11 +92,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _pickAndUploadImage() async {
+    if (_user == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      final imageFile = File(pickedFile.path);
+      final photoUrl =
+          await _imageService.uploadProfileImage(imageFile, _user!.id);
+
+      if (photoUrl != null) {
+        // Mettre à jour le profil avec la nouvelle photo
+        await _userRepository.updateUserProfile(_user!.id, {'photo': photoUrl});
+
+        // Recharger les données du profil
+        await _loadUserData();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo de profil mise à jour')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Erreur lors du téléchargement de l\'image: ${e.toString()}')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isUploadingImage = false;
+      });
+    }
+  }
+
   void _navigateToSportSelection() async {
+    if (_user == null) return;
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const SportSelectionScreen(),
+        builder: (context) => SportSelectionScreen(userId: _user!.id),
       ),
     );
 
@@ -185,45 +244,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Center(
                         child: Column(
                           children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade100,
-                                shape: BoxShape.circle,
-                                image: _user!.photo != null
-                                    ? DecorationImage(
-                                        image: NetworkImage(_user!.photo!),
-                                        fit: BoxFit.cover,
+                            Stack(
+                              children: [
+                                // Photo de profil
+                                _isUploadingImage
+                                    ? const CircleAvatar(
+                                        radius: 60,
+                                        backgroundColor: Colors.grey,
+                                        child: CircularProgressIndicator(),
                                       )
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
+                                    : GestureDetector(
+                                        onTap: _pickAndUploadImage,
+                                        child: Container(
+                                          width: 120,
+                                          height: 120,
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade100,
+                                            shape: BoxShape.circle,
+                                            image: _user.photo != null
+                                                ? DecorationImage(
+                                                    image:
+                                                        CachedNetworkImageProvider(
+                                                            _user.photo!),
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : null,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.1),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: _user.photo == null
+                                              ? Icon(
+                                                  Icons.person,
+                                                  size: 60,
+                                                  color: Colors.blue.shade800,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                // Bouton pour changer la photo
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).primaryColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      onPressed: _pickAndUploadImage,
+                                    ),
                                   ),
-                                ],
-                              ),
-                              child: _user!.photo == null
-                                  ? Icon(
-                                      Icons.person,
-                                      size: 60,
-                                      color: Colors.blue.shade800,
-                                    )
-                                  : null,
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              '@${_user!.pseudo ?? "Sans pseudo"}',
+                              '@${_user.pseudo ?? "Sans pseudo"}',
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if (_user!.firstName != null)
+                            if (_user.firstName != null)
                               Text(
-                                _user!.firstName!,
+                                _user.firstName!,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey,
@@ -236,8 +331,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 24),
 
                       // Description
-                      if (_user!.description != null &&
-                          _user!.description!.isNotEmpty) ...[
+                      if (_user.description != null &&
+                          _user.description!.isNotEmpty) ...[
                         const Text(
                           'À propos',
                           style: TextStyle(
@@ -250,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(_user!.description!),
+                          child: Text(_user.description!),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -401,7 +496,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       const SizedBox(height: 32),
 
-                      // Autres sections (statistiques, matchs, etc.)
+                      // Statistiques
                       const Text(
                         'Statistiques',
                         style: TextStyle(
@@ -420,9 +515,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceAround,
                                 children: [
-                                  _buildStatItem(context, 'Matchs', '5'),
-                                  _buildStatItem(context, 'Partenaires', '3'),
-                                  _buildStatItem(context, 'Réservations', '2'),
+                                  _buildStatItem(context, 'Sports',
+                                      '${_userSports.length}'),
+                                  _buildStatItem(context, 'Partenaires', '0'),
+                                  _buildStatItem(context, 'Lieux visités', '0'),
                                 ],
                               ),
                             ],
@@ -476,8 +572,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      const SizedBox(
-                          height: 60), // Espace en bas pour le scroll
+                      const SizedBox(height: 60),
                     ],
                   ),
                 ),

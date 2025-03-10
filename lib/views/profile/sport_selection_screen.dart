@@ -1,12 +1,15 @@
+// lib/views/profile/sport_selection_screen.dart
 import 'package:flutter/material.dart';
 import '../../models/sport_model.dart';
 import '../../models/sport_user_model.dart';
 import '../../repositories/sport_repository.dart';
-import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 
 class SportSelectionScreen extends StatefulWidget {
-  const SportSelectionScreen({Key? key}) : super(key: key);
+  final String userId;
+
+  const SportSelectionScreen({Key? key, required this.userId})
+      : super(key: key);
 
   @override
   _SportSelectionScreenState createState() => _SportSelectionScreenState();
@@ -14,7 +17,6 @@ class SportSelectionScreen extends StatefulWidget {
 
 class _SportSelectionScreenState extends State<SportSelectionScreen> {
   final _sportRepository = SportRepository();
-  final _authRepository = AuthRepository();
   final _userRepository = UserRepository();
 
   List<SportModel> _allSports = [];
@@ -23,7 +25,7 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _userId;
+  String? _errorMessage;
 
   final Map<int, String> _skillLevels = {};
   final Map<int, bool> _lookingForPartners = {};
@@ -44,41 +46,33 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      // Récupérer l'utilisateur actuel
-      final currentUser = await _authRepository.getCurrentUser();
-      if (currentUser == null) {
-        throw Exception("Utilisateur non connecté");
-      }
-
-      _userId = currentUser.id;
-
       // Charger tous les sports disponibles
       _allSports = await _sportRepository.getAllSports();
 
       // Charger les sports de l'utilisateur
-      if (_userId != null) {
-        _userSports = await _userRepository.getUserSports(_userId!);
+      _userSports = await _userRepository.getUserSports(widget.userId);
 
-        // Marquer les sports déjà sélectionnés
-        for (var userSport in _userSports) {
-          final sport = _allSports.firstWhere(
-            (s) => s.id == userSport.sportId,
-            orElse: () =>
-                SportModel(id: userSport.sportId, name: 'Sport inconnu'),
-          );
+      // Marquer les sports déjà sélectionnés
+      for (var userSport in _userSports) {
+        final sport = _allSports.firstWhere(
+          (s) => s.id == userSport.sportId,
+          orElse: () => SportModel(
+              id: userSport.sportId, name: 'Sport #${userSport.sportId}'),
+        );
 
-          _selectedSports.add(sport);
-          _skillLevels[sport.id] = userSport.skillLevel ?? 'Débutant';
-          _lookingForPartners[sport.id] = userSport.lookingForPartners;
-        }
+        _selectedSports.add(sport);
+        _skillLevels[sport.id] = userSport.skillLevel ?? 'Débutant';
+        _lookingForPartners[sport.id] = userSport.lookingForPartners;
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
-      );
+      setState(() {
+        _errorMessage =
+            'Erreur lors du chargement des données: ${e.toString()}';
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -87,44 +81,79 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
   }
 
   Future<void> _saveUserSports() async {
-    if (_userId == null) return;
-
     setState(() {
       _isSaving = true;
+      _errorMessage = null;
     });
 
     try {
-      // Pour chaque sport sélectionné
-      for (var sport in _selectedSports) {
-        final skillLevel = _skillLevels[sport.id] ?? 'Débutant';
-        final lookingForPartners = _lookingForPartners[sport.id] ?? false;
+      // Liste des sports actuels de l'utilisateur
+      final currentSportIds = _userSports.map((s) => s.sportId).toSet();
+      // Liste des sports sélectionnés
+      final selectedSportIds = _selectedSports.map((s) => s.id).toSet();
 
-        // Ajouter ou mettre à jour le sport pour l'utilisateur
+      // Sports à ajouter
+      final sportsToAdd = selectedSportIds.difference(currentSportIds);
+      // Sports à supprimer
+      final sportsToRemove = currentSportIds.difference(selectedSportIds);
+      // Sports à mettre à jour (existants et toujours sélectionnés)
+      final sportsToUpdate = selectedSportIds.intersection(currentSportIds);
+
+      // Ajouter les nouveaux sports
+      for (var sportId in sportsToAdd) {
+        final skillLevel = _skillLevels[sportId] ?? 'Débutant';
+        final lookingForPartners = _lookingForPartners[sportId] ?? false;
+
         await _sportRepository.addSportToUser(
-          _userId!,
-          sport.id,
+          widget.userId,
+          sportId,
           skillLevel: skillLevel,
           lookingForPartners: lookingForPartners,
         );
       }
 
-      // Pour les sports qui étaient sélectionnés mais ne le sont plus, il faudrait les supprimer
-      // Ceci est un exemple simple, vous pourriez vouloir implémenter une logique plus sophistiquée
+      // Mettre à jour les sports existants
+      for (var sportId in sportsToUpdate) {
+        final skillLevel = _skillLevels[sportId] ?? 'Débutant';
+        final lookingForPartners = _lookingForPartners[sportId] ?? false;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Vos sports ont été enregistrés avec succès')),
-      );
+        await _sportRepository.addSportToUser(
+          widget.userId,
+          sportId,
+          skillLevel: skillLevel,
+          lookingForPartners: lookingForPartners,
+        );
+      }
 
-      Navigator.pop(context, true); // Retour avec résultat positif
+      // Supprimer les sports qui ne sont plus sélectionnés
+      for (var sportId in sportsToRemove) {
+        await _removeSportFromUser(sportId);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sports enregistrés avec succès')),
+        );
+        Navigator.pop(
+            context, true); // Retourner true pour indiquer des changements
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l\'enregistrement: $e')),
-      );
+      setState(() {
+        _errorMessage = 'Erreur lors de l\'enregistrement: ${e.toString()}';
+      });
     } finally {
       setState(() {
         _isSaving = false;
       });
+    }
+  }
+
+  Future<void> _removeSportFromUser(int sportId) async {
+    try {
+      await _sportRepository.removeSportFromUser(widget.userId, sportId);
+    } catch (e) {
+      throw Exception(
+          'Erreur lors de la suppression du sport: ${e.toString()}');
     }
   }
 
@@ -148,60 +177,62 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(builder: (context, setState) {
-        return AlertDialog(
-          title: Text('Configuration pour ${sport.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Votre niveau:'),
-              DropdownButton<String>(
-                value: currentLevel,
-                isExpanded: true,
-                items: _availableLevels.map((level) {
-                  return DropdownMenuItem<String>(
-                    value: level,
-                    child: Text(level),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    currentLevel = value!;
-                  });
-                },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text('Configuration pour ${sport.name}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Votre niveau:'),
+                DropdownButton<String>(
+                  value: currentLevel,
+                  isExpanded: true,
+                  items: _availableLevels.map((level) {
+                    return DropdownMenuItem<String>(
+                      value: level,
+                      child: Text(level),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      currentLevel = value!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: const Text('Je recherche des partenaires'),
+                  value: isLookingForPartners,
+                  onChanged: (value) {
+                    setState(() {
+                      isLookingForPartners = value!;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Annuler'),
+                onPressed: () => Navigator.of(context).pop(),
               ),
-              const SizedBox(height: 16),
-              CheckboxListTile(
-                title: const Text('Je recherche des partenaires'),
-                value: isLookingForPartners,
-                onChanged: (value) {
-                  setState(() {
-                    isLookingForPartners = value!;
+              ElevatedButton(
+                child: const Text('Confirmer'),
+                onPressed: () {
+                  // Mettre à jour les valeurs
+                  this.setState(() {
+                    _skillLevels[sport.id] = currentLevel;
+                    _lookingForPartners[sport.id] = isLookingForPartners;
                   });
+                  Navigator.of(context).pop();
                 },
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              child: const Text('Confirmer'),
-              onPressed: () {
-                // Mettre à jour les valeurs
-                this.setState(() {
-                  _skillLevels[sport.id] = currentLevel;
-                  _lookingForPartners[sport.id] = isLookingForPartners;
-                });
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 
@@ -209,142 +240,220 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Sélection des sports')),
+        appBar: AppBar(title: const Text('Mes sports')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sélection des sports'),
+        title: const Text('Mes sports'),
         actions: [
-          _isSaving
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.check),
-                  onPressed: _saveUserSports,
-                  tooltip: 'Enregistrer',
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
                 ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _saveUserSports,
+              tooltip: 'Enregistrer',
+            ),
         ],
       ),
-      body: Column(
-        children: [
-          // En-tête
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Choisissez vos sports',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: _errorMessage != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _loadData,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Réessayer'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sélectionnez les sports que vous pratiquez et configurez vos préférences',
-                  style: TextStyle(color: Colors.grey[600]),
+              ),
+            )
+          : Column(
+              children: [
+                // En-tête avec instructions
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sélectionnez vos sports',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Choisissez les sports que vous pratiquez et personnalisez vos préférences pour chacun.',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Sports sélectionnés
+                if (_selectedSports.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      border: Border(
+                        top: BorderSide(color: Colors.grey.shade300),
+                        bottom: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Sports sélectionnés:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              '${_selectedSports.length} sport(s)',
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _selectedSports.map((sport) {
+                            return InkWell(
+                              onTap: () => _showSportConfigDialog(sport),
+                              child: Chip(
+                                label: Text(sport.name),
+                                deleteIcon: const Icon(Icons.close, size: 18),
+                                onDeleted: () => _toggleSportSelection(sport),
+                                backgroundColor:
+                                    _lookingForPartners[sport.id] == true
+                                        ? Colors.green.shade100
+                                        : Colors.blue.shade100,
+                                labelStyle: TextStyle(
+                                  color: _lookingForPartners[sport.id] == true
+                                      ? Colors.green.shade800
+                                      : Colors.blue.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                avatar: CircleAvatar(
+                                  backgroundColor: Colors.transparent,
+                                  child: Icon(
+                                    Icons.sports,
+                                    size: 16,
+                                    color: _lookingForPartners[sport.id] == true
+                                        ? Colors.green.shade800
+                                        : Colors.blue.shade800,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Liste des sports disponibles
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _allSports.length,
+                    itemBuilder: (context, index) {
+                      final sport = _allSports[index];
+                      final isSelected = _selectedSports.contains(sport);
+
+                      return ListTile(
+                        title: Text(sport.name),
+                        subtitle: isSelected
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      'Niveau: ${_skillLevels[sport.id] ?? "Débutant"}'),
+                                  Text(_lookingForPartners[sport.id] == true
+                                      ? 'Recherche de partenaires: Oui'
+                                      : 'Recherche de partenaires: Non'),
+                                ],
+                              )
+                            : Text(sport.description ?? 'Touchez pour ajouter'),
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.grey.shade200,
+                          child: Icon(
+                            isSelected ? Icons.check : Icons.sports,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? IconButton(
+                                icon: const Icon(Icons.settings),
+                                onPressed: () => _showSportConfigDialog(sport),
+                                tooltip: 'Configurer',
+                              )
+                            : null,
+                        onTap: () => _toggleSportSelection(sport),
+                        selected: isSelected,
+                        selectedTileColor: Colors.blue.shade50,
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
-
-          // Sports sélectionnés
-          if (_selectedSports.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Vos sports:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _selectedSports.map((sport) {
-                      return InkWell(
-                        onTap: () => _showSportConfigDialog(sport),
-                        child: Chip(
-                          label: Text(sport.name),
-                          deleteIcon: const Icon(Icons.close),
-                          onDeleted: () => _toggleSportSelection(sport),
-                          avatar: CircleAvatar(
-                            backgroundColor: Theme.of(context).primaryColor,
-                            child: Text(
-                              sport.name.substring(0, 1).toUpperCase(),
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 12),
-                            ),
-                          ),
-                          backgroundColor: Colors.blue.shade100,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
+      bottomNavigationBar: BottomAppBar(
+        elevation: 8,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ElevatedButton(
+            onPressed: _isSaving ? null : _saveUserSports,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
               ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
-
-          const Divider(height: 32),
-
-          // Liste des sports disponibles
-          Expanded(
-            child: ListView.builder(
-              itemCount: _allSports.length,
-              itemBuilder: (context, index) {
-                final sport = _allSports[index];
-                final isSelected = _selectedSports.contains(sport);
-
-                return ListTile(
-                  title: Text(sport.name),
-                  subtitle: isSelected
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                'Niveau: ${_skillLevels[sport.id] ?? "Débutant"}'),
-                            Text(_lookingForPartners[sport.id] == true
-                                ? 'Recherche de partenaires: Oui'
-                                : 'Recherche de partenaires: Non'),
-                          ],
-                        )
-                      : Text(sport.description ?? 'Touchez pour ajouter'),
-                  leading: CircleAvatar(
-                    backgroundColor: isSelected
-                        ? Theme.of(context).primaryColor
-                        : Colors.grey.shade200,
-                    child: Icon(
-                      isSelected ? Icons.check : Icons.sports,
-                      color: isSelected ? Colors.white : Colors.grey.shade700,
+            child: _isSaving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
                     ),
-                  ),
-                  trailing: isSelected
-                      ? IconButton(
-                          icon: const Icon(Icons.settings),
-                          onPressed: () => _showSportConfigDialog(sport),
-                          tooltip: 'Configurer',
-                        )
-                      : null,
-                  onTap: () => _toggleSportSelection(sport),
-                  selected: isSelected,
-                  selectedTileColor: Colors.blue.shade50,
-                );
-              },
-            ),
+                  )
+                : const Text('Enregistrer mes sports'),
           ),
-        ],
+        ),
       ),
     );
   }

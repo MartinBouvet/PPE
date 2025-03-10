@@ -64,6 +64,23 @@ class SportRepository {
       return false;
     }
   }
+// Mise à jour de lib/repositories/sport_repository.dart
+// Ajouter la méthode suivante à la classe SportRepository
+
+  // Supprimer un sport de l'utilisateur
+  Future<bool> removeSportFromUser(String userId, int sportId) async {
+    try {
+      await _supabase
+          .from('sport_user')
+          .delete()
+          .eq('id_user', userId)
+          .eq('id_sport', sportId);
+      return true;
+    } catch (e) {
+      debugPrint('Erreur lors de la suppression du sport: $e');
+      return false;
+    }
+  }
 
   // Méthode pour ajouter un sport à un utilisateur
   Future<bool> addSportToUser(
