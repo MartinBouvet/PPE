@@ -2,15 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../models/user_model.dart';
 import '../../models/facility_model.dart';
+import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/facility_repository.dart';
+import '../../repositories/sport_repository.dart';
 import '../../services/image_service.dart';
-import '../profile/edit_profile_screen.dart'; // Correction du chemin d'importation
-import '../profile/sport_selection_screen.dart'; // Correction du chemin d'importation
 import 'facility_detail_screen.dart';
 
 class FacilityScreen extends StatefulWidget {
@@ -23,14 +22,17 @@ class FacilityScreen extends StatefulWidget {
 class _FacilityScreenState extends State<FacilityScreen> {
   final _authRepository = AuthRepository();
   final _facilityRepository = FacilityRepository();
+  final _sportRepository = SportRepository();
   final _imageService = ImageService();
 
   UserModel? _user;
   List<SportFacilityModel> _facilities = [];
+  List<SportModel> _sports = [];
   bool _isLoading = true;
   String? _errorMessage;
   String _searchQuery = '';
   String? _selectedArrondissement;
+  int? _selectedSportId;
 
   final List<String> _arrondissements = [
     'Tous',
@@ -71,6 +73,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
     try {
       _user = await _authRepository.getCurrentUser();
       _facilities = await _facilityRepository.getAllFacilities();
+      _sports = await _sportRepository.getAllSports();
     } catch (e) {
       setState(() {
         _errorMessage =
@@ -96,7 +99,12 @@ class _FacilityScreenState extends State<FacilityScreen> {
           _selectedArrondissement == 'Tous' ||
           facility.arrondissement == _selectedArrondissement;
 
-      return (nameMatches || addressMatches) && arrondissementMatches;
+      final sportMatches = _selectedSportId == null ||
+          facility.sportIds.contains(_selectedSportId);
+
+      return (nameMatches || addressMatches) &&
+          arrondissementMatches &&
+          sportMatches;
     }).toList();
   }
 
@@ -144,30 +152,70 @@ class _FacilityScreenState extends State<FacilityScreen> {
             ),
           ),
 
-          // Filtre par arrondissement
+          // Filtres
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'Arrondissement',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Arrondissement',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                    ),
+                    value: _selectedArrondissement ?? 'Tous',
+                    items: _arrondissements
+                        .map((arr) => DropdownMenuItem(
+                              value: arr,
+                              child: Text(arr),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedArrondissement = value;
+                      });
+                    },
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
-              ),
-              value: _selectedArrondissement ?? 'Tous',
-              items: _arrondissements
-                  .map((arr) => DropdownMenuItem(
-                        value: arr,
-                        child: Text(arr),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedArrondissement = value;
-                });
-              },
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<int?>(
+                    decoration: InputDecoration(
+                      labelText: 'Sport',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 16),
+                    ),
+                    value: _selectedSportId,
+                    hint: const Text('Tous'),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Tous'),
+                      ),
+                      ..._sports.map((sport) => DropdownMenuItem(
+                            value: sport.id,
+                            child: Text(sport.name),
+                          )),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSportId = value;
+                      });
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -212,12 +260,14 @@ class _FacilityScreenState extends State<FacilityScreen> {
                             ),
                             const SizedBox(height: 8),
                             if (_searchQuery.isNotEmpty ||
-                                _selectedArrondissement != 'Tous')
+                                _selectedArrondissement != 'Tous' ||
+                                _selectedSportId != null)
                               TextButton.icon(
                                 onPressed: () {
                                   setState(() {
                                     _searchQuery = '';
                                     _selectedArrondissement = 'Tous';
+                                    _selectedSportId = null;
                                   });
                                 },
                                 icon: const Icon(Icons.clear),
@@ -244,7 +294,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => FacilityDetailScreen(
                                       facility: facility,
-                                      sports: [], // Vous devrez passer les sports ici
+                                      sports: _sports,
                                     ),
                                   ),
                                 );
@@ -324,21 +374,85 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                         ),
                                         const SizedBox(height: 8),
 
-                                        // Arrondissement
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade100,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            facility.arrondissement,
-                                            style: TextStyle(
-                                                color: Colors.blue.shade800,
-                                                fontSize: 12),
-                                          ),
+                                        // Sports & Arrondissement
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade100,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                facility.arrondissement,
+                                                style: TextStyle(
+                                                    color: Colors.blue.shade800,
+                                                    fontSize: 12),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            if (facility.sportIds.isNotEmpty &&
+                                                facility.sportIds.length <= 3)
+                                              ...facility.sportIds
+                                                  .take(3)
+                                                  .map((sportId) {
+                                                final sport =
+                                                    _sports.firstWhere(
+                                                  (s) => s.id == sportId,
+                                                  orElse: () => SportModel(
+                                                      id: sportId,
+                                                      name: 'Sport $sportId'),
+                                                );
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          right: 4),
+                                                  child: Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          Colors.green.shade100,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              4),
+                                                    ),
+                                                    child: Text(
+                                                      sport.name,
+                                                      style: TextStyle(
+                                                          color: Colors
+                                                              .green.shade800,
+                                                          fontSize: 10),
+                                                    ),
+                                                  ),
+                                                );
+                                              }),
+                                            if (facility.sportIds.length > 3)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.shade100,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  "+${facility.sportIds.length - 3} sports",
+                                                  style: TextStyle(
+                                                      color:
+                                                          Colors.amber.shade800,
+                                                      fontSize: 10),
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ],
                                     ),

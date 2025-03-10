@@ -33,6 +33,7 @@ dependencies:
   image_picker: ^1.0.4
   path: ^1.8.3
   uuid: ^4.0.0
+  timeago: ^3.5.0
   
   # UI
   cupertino_icons: ^1.0.2
@@ -81,3 +82,4 @@ flutter:
         - asset: assets/fonts/Poppins-Medium.ttf
           weight: 500
         - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
