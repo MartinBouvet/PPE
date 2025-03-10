@@ -1,9 +1,9 @@
-// lib/views/discover/profile_card.dart
+// lib/widgets/profile_card.dart
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math' as math;
 import '../../models/user_model.dart';
 import '../../models/sport_model.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileCard extends StatefulWidget {
   final UserModel user;
@@ -20,11 +20,11 @@ class ProfileCard extends StatefulWidget {
     required this.onLike,
     required this.onSkip,
     this.isActive = true,
-    this.sportLevel = 'Inconnu',
+    this.sportLevel = 'Intermédiaire',
   }) : super(key: key);
 
   @override
-  _ProfileCardState createState() => _ProfileCardState();
+  State<ProfileCard> createState() => _ProfileCardState();
 }
 
 class _ProfileCardState extends State<ProfileCard>
@@ -35,7 +35,6 @@ class _ProfileCardState extends State<ProfileCard>
   double _dragExtent = 0;
   bool _isDragging = false;
   bool _isExiting = false;
-  double _angle = 0;
 
   @override
   void initState() {
@@ -65,18 +64,9 @@ class _ProfileCardState extends State<ProfileCard>
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!_isDragging || !widget.isActive) return;
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final dragDelta = details.localPosition - _dragStart;
-
-    // Calcul de l'angle de rotation basé sur le déplacement horizontal
-    // Plus on est loin du centre, plus l'angle est important
-    final newAngle = dragDelta.dx / screenWidth * 0.5; // Max ~30 degrés
-
     setState(() {
       _dragPosition = details.localPosition;
-      _dragExtent = dragDelta.dx;
-      _angle = newAngle;
+      _dragExtent = _dragPosition.dx - _dragStart.dx;
     });
   }
 
@@ -84,45 +74,22 @@ class _ProfileCardState extends State<ProfileCard>
     if (!_isDragging || !widget.isActive) return;
     _isDragging = false;
 
-    final screenWidth = MediaQuery.of(context).size.width;
     final velocity = details.velocity.pixelsPerSecond.dx;
-    final isRightSwipe = _dragExtent > screenWidth * 0.4 || velocity > 700;
-    final isLeftSwipe = _dragExtent < -screenWidth * 0.4 || velocity < -700;
+    final isRightSwipe = _dragExtent > 100 || velocity > 700;
+    final isLeftSwipe = _dragExtent < -100 || velocity < -700;
 
     if (isRightSwipe) {
       _animateExit(true);
     } else if (isLeftSwipe) {
       _animateExit(false);
     } else {
-      // Retour à la position initiale avec une animation
-      _resetPosition();
-    }
-  }
-
-  void _resetPosition() {
-    setState(() {
-      _isExiting = false;
-    });
-
-    // Animation de retour au centre
-    final resetTween = Tween<double>(begin: _dragExtent, end: 0.0);
-    final angleTween = Tween<double>(begin: _angle, end: 0.0);
-
-    Animation<double> resetAnimation = resetTween.animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-
-    Animation<double> angleAnimation = angleTween.animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-
-    resetAnimation.addListener(() {
+      // Reset position
       setState(() {
-        _dragExtent = resetAnimation.value;
-        _angle = angleAnimation.value;
+        _dragStart = Offset.zero;
+        _dragPosition = Offset.zero;
+        _dragExtent = 0;
       });
-    });
-
-    _animationController.reset();
-    _animationController.forward();
+    }
   }
 
   void _animateExit(bool isLike) {
@@ -130,20 +97,6 @@ class _ProfileCardState extends State<ProfileCard>
       _isExiting = true;
     });
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final targetX = isLike ? screenWidth * 1.5 : -screenWidth * 1.5;
-    final exitTween = Tween<double>(begin: _dragExtent, end: targetX);
-
-    Animation<double> exitAnimation = exitTween.animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-
-    exitAnimation.addListener(() {
-      setState(() {
-        _dragExtent = exitAnimation.value;
-      });
-    });
-
-    _animationController.reset();
     _animationController.forward().then((_) {
       if (isLike) {
         widget.onLike();
@@ -158,96 +111,67 @@ class _ProfileCardState extends State<ProfileCard>
     final screenSize = MediaQuery.of(context).size;
     final opacity = widget.isActive ? 1.0 : 0.8;
 
-    // Calculer le pourcentage de déplacement par rapport à la largeur de l'écran
-    final swipePercentage = _dragExtent.abs() / (screenSize.width * 0.5);
-    final cappedSwipePercentage = swipePercentage.clamp(0.0, 1.0);
+    // Calculate rotation and offset based on drag or animation
+    final rotation = (_dragExtent / 300) * (math.pi / 8);
+    double dx = _dragExtent;
 
-    // Calculer la couleur de l'overlay en fonction de la direction du swipe
-    final overlayColor = _dragExtent > 0
-        ? Colors.green.withOpacity(0.2 * cappedSwipePercentage) // Like - Vert
-        : Colors.red.withOpacity(0.2 * cappedSwipePercentage); // Skip - Rouge
+    // If animating exit
+    if (_isExiting) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      dx = _animationController.value *
+          (screenWidth + 200) *
+          (_dragExtent > 0 ? 1 : -1);
+    }
 
-    return Opacity(
-      opacity: opacity,
-      child: Transform.translate(
-        offset: Offset(_dragExtent, 0),
-        child: Transform.rotate(
-          angle: _angle,
-          child: Container(
-            margin: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: GestureDetector(
-              onPanStart: _startDrag,
-              onPanUpdate: _onDragUpdate,
-              onPanEnd: _onDragEnd,
+    return GestureDetector(
+      onPanStart: _startDrag,
+      onPanUpdate: _onDragUpdate,
+      onPanEnd: _onDragEnd,
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.translate(
+          offset: Offset(dx, 0),
+          child: Transform.rotate(
+            angle: rotation,
+            child: Container(
+              margin: const EdgeInsets.all(16.0),
+              height: screenSize.height * 0.7,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(
                   children: [
                     // Photo de profil
-                    Positioned.fill(
-                      child: widget.user.photo != null
-                          ? CachedNetworkImage(
-                              imageUrl: widget.user.photo!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey.shade200,
-                                child: const Center(
-                                    child: CircularProgressIndicator()),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(Icons.person,
-                                    size: 80, color: Colors.grey.shade800),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        image: widget.user.photo != null
+                            ? DecorationImage(
+                                image: CachedNetworkImageProvider(
+                                    widget.user.photo!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: widget.user.photo == null
+                          ? Center(
+                              child: Icon(
+                                Icons.person,
+                                size: 80,
+                                color: Colors.grey.shade500,
                               ),
                             )
-                          : Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(Icons.person,
-                                  size: 80, color: Colors.grey.shade800),
-                            ),
+                          : null,
                     ),
-
-                    // Overlay coloré pour indiquer la direction du swipe
-                    Positioned.fill(
-                      child: Container(
-                        color: overlayColor,
-                      ),
-                    ),
-
-                    // Indicateurs de swipe
-                    if (_dragExtent.abs() > 20)
-                      Positioned(
-                        top: 40,
-                        left: _dragExtent > 0 ? 20 : null,
-                        right: _dragExtent < 0 ? 20 : null,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _dragExtent > 0 ? Colors.green : Colors.red,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: Text(
-                            _dragExtent > 0 ? "MATCH !" : "PASSER",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                      ),
 
                     // Overlay dégradé en bas pour le texte
                     Positioned(
@@ -255,6 +179,7 @@ class _ProfileCardState extends State<ProfileCard>
                       right: 0,
                       bottom: 0,
                       child: Container(
+                        height: 220,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -268,20 +193,18 @@ class _ProfileCardState extends State<ProfileCard>
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.user.firstName ??
-                                        widget.user.pseudo ??
-                                        "Anonyme",
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                Text(
+                                  widget.user.firstName ??
+                                      widget.user.pseudo ??
+                                      "Anonyme",
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -349,14 +272,14 @@ class _ProfileCardState extends State<ProfileCard>
                                     color: Colors.white.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     children: [
-                                      Icon(Icons.location_on,
+                                      const Icon(Icons.location_on,
                                           size: 14, color: Colors.white),
-                                      SizedBox(width: 4),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        'Paris',
-                                        style: TextStyle(
+                                        '${(math.Random().nextDouble() * 10).toStringAsFixed(1)} km',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 12,
                                         ),
@@ -397,7 +320,7 @@ class _ProfileCardState extends State<ProfileCard>
                                 ElevatedButton.icon(
                                   onPressed: widget.onLike,
                                   icon: const Icon(Icons.check),
-                                  label: const Text("Match !"),
+                                  label: const Text("Proposer"),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green.shade600,
                                     foregroundColor: Colors.white,
@@ -412,6 +335,31 @@ class _ProfileCardState extends State<ProfileCard>
                         ),
                       ),
                     ),
+
+                    // Indicateurs de swipe
+                    if (_dragExtent != 0)
+                      Positioned(
+                        top: 40,
+                        left: _dragExtent > 0 ? 20 : null,
+                        right: _dragExtent < 0 ? 20 : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _dragExtent > 0 ? Colors.green : Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: Text(
+                            _dragExtent > 0 ? "PROPOSER" : "PASSER",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

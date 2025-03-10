@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:io';
+import 'dart:math' as math;
 import '../../models/user_model.dart';
 import '../../models/facility_model.dart';
 import '../../models/sport_model.dart';
@@ -56,11 +56,13 @@ class _FacilityScreenState extends State<FacilityScreen> {
     '18ème',
     '19ème',
     '20ème',
+    'Proche 15ème',
   ];
 
   @override
   void initState() {
     super.initState();
+    _selectedArrondissement = 'Tous';
     _loadData();
   }
 
@@ -74,6 +76,12 @@ class _FacilityScreenState extends State<FacilityScreen> {
       _user = await _authRepository.getCurrentUser();
       _facilities = await _facilityRepository.getAllFacilities();
       _sports = await _sportRepository.getAllSports();
+
+      // Si aucune installation n'est disponible, initialiser les données de test
+      if (_facilities.isEmpty) {
+        await _facilityRepository.initializeFacilitiesData();
+        _facilities = await _facilityRepository.getAllFacilities();
+      }
     } catch (e) {
       setState(() {
         _errorMessage =
@@ -90,15 +98,18 @@ class _FacilityScreenState extends State<FacilityScreen> {
 
   List<SportFacilityModel> _getFilteredFacilities() {
     return _facilities.where((facility) {
+      // Filtre de recherche par nom ou adresse
       final nameMatches =
           facility.name.toLowerCase().contains(_searchQuery.toLowerCase());
       final addressMatches =
           facility.address.toLowerCase().contains(_searchQuery.toLowerCase());
 
+      // Filtre par arrondissement
       final arrondissementMatches = _selectedArrondissement == null ||
           _selectedArrondissement == 'Tous' ||
           facility.arrondissement == _selectedArrondissement;
 
+      // Filtre par sport
       final sportMatches = _selectedSportId == null ||
           facility.sportIds.contains(_selectedSportId);
 
@@ -106,6 +117,44 @@ class _FacilityScreenState extends State<FacilityScreen> {
           arrondissementMatches &&
           sportMatches;
     }).toList();
+  }
+
+  // Méthode pour calculer une distance aléatoire mais cohérente pour chaque installation
+  double _getRandomDistance(int facilityId) {
+    // Utiliser l'ID comme seed pour avoir la même valeur à chaque fois
+    final random = math.Random(facilityId);
+    return random.nextDouble() * 10 + 0.1; // Entre 0.1 et 10.1 km
+  }
+
+  // Méthode pour obtenir une image aléatoire si l'installation n'en a pas
+  String _getDefaultImage(int sportId) {
+    final sportImages = {
+      1: 'https://images.unsplash.com/photo-1505666287802-931dc83a0fe4', // Basketball
+      2: 'https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534', // Tennis
+      3: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68', // Football
+      4: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571', // Natation
+      5: 'https://images.unsplash.com/photo-1551632811-561732d1e306', // Randonnée
+      6: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b', // Yoga
+      7: 'https://images.unsplash.com/photo-1564769662533-4f00a87b4056', // Escalade
+      8: 'https://images.unsplash.com/photo-1541904845501-0d2077efd264', // Fitness
+      9: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8', // Course à pied
+    };
+
+    if (sportId > 0 && sportImages.containsKey(sportId)) {
+      return '${sportImages[sportId]}?w=800&q=80';
+    }
+
+    // Image par défaut
+    return 'https://images.unsplash.com/photo-1470468969717-61d5d54fd036?w=800&q=80';
+  }
+
+  // Format de prix en euros
+  String _formatPrice(String? price) {
+    if (price == null || price.isEmpty) {
+      return 'Prix non disponible';
+    }
+    if (price == 'Gratuit') return price;
+    return price;
   }
 
   @override
@@ -280,6 +329,16 @@ class _FacilityScreenState extends State<FacilityScreen> {
                         itemCount: filteredFacilities.length,
                         itemBuilder: (context, index) {
                           final facility = filteredFacilities[index];
+
+                          // Déterminer le sport principal pour l'image
+                          int primarySportId = 0;
+                          if (facility.sportIds.isNotEmpty) {
+                            primarySportId = _selectedSportId != null &&
+                                    facility.sportIds.contains(_selectedSportId)
+                                ? _selectedSportId!
+                                : facility.sportIds.first;
+                          }
+
                           return Card(
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 16.0, vertical: 8.0),
@@ -323,21 +382,29 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                             ),
                                             errorWidget:
                                                 (context, url, error) =>
-                                                    Container(
+                                                    Image.network(
+                                              _getDefaultImage(primarySportId),
                                               height: 150,
-                                              color: Colors.grey.shade300,
-                                              child: const Icon(
-                                                  Icons.image_not_supported,
-                                                  size: 48),
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
                                             ),
                                           )
-                                        : Container(
+                                        : Image.network(
+                                            _getDefaultImage(primarySportId),
                                             height: 150,
-                                            color: Colors.blue.shade100,
-                                            child: Center(
-                                              child: Icon(Icons.sports,
-                                                  size: 48,
-                                                  color: Colors.blue.shade700),
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Container(
+                                              height: 150,
+                                              color: Colors.blue.shade100,
+                                              child: Center(
+                                                child: Icon(Icons.sports,
+                                                    size: 48,
+                                                    color:
+                                                        Colors.blue.shade700),
+                                              ),
                                             ),
                                           ),
                                   ),
@@ -349,11 +416,49 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          facility.name,
-                                          style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                facility.name,
+                                                style: const TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight:
+                                                        FontWeight.bold),
+                                              ),
+                                            ),
+                                            // Badge avec la distance
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green.shade100,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.directions_walk,
+                                                      size: 14,
+                                                      color: Colors
+                                                          .green.shade800),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '${_getRandomDistance(facility.id).toStringAsFixed(1)} km',
+                                                    style: TextStyle(
+                                                        color: Colors
+                                                            .green.shade800,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         const SizedBox(height: 4),
                                         Row(
@@ -372,6 +477,26 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 8),
+
+                                        // Prix
+                                        if (facility.priceRange != null)
+                                          Row(
+                                            children: [
+                                              Icon(Icons.euro,
+                                                  size: 16,
+                                                  color: Colors.grey.shade700),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _formatPrice(
+                                                    facility.priceRange),
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+
                                         const SizedBox(height: 8),
 
                                         // Sports & Arrondissement

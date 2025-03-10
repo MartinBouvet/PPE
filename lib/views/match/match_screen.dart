@@ -4,11 +4,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_model.dart';
 import '../../models/match_model.dart';
+import '../../models/sport_user_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../repositories/match_repository.dart';
 import '../chat/conversation_screen.dart';
+import '../discover/profile_card.dart';
 
 class MatchScreen extends StatefulWidget {
   const MatchScreen({Key? key}) : super(key: key);
@@ -31,11 +33,14 @@ class _MatchScreenState extends State<MatchScreen>
   List<MatchModel> _pendingRequests = [];
   List<MatchModel> _acceptedMatches = [];
   Map<String, UserModel?> _usersMap = {};
+  Map<String, Map<int, SportUserModel>> _userSportsMap = {};
+  Map<int, SportModel> _sportsMap = {};
 
   int? _selectedSportId;
   bool _isLoading = true;
   bool _isProcessing = false;
   String? _errorMessage;
+  bool _showEmptyMatchMessage = false;
 
   @override
   void initState() {
@@ -54,6 +59,7 @@ class _MatchScreenState extends State<MatchScreen>
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _showEmptyMatchMessage = false;
     });
 
     try {
@@ -63,9 +69,14 @@ class _MatchScreenState extends State<MatchScreen>
       if (_currentUser != null) {
         // Get all sports
         _sports = await _sportRepository.getAllSports();
+        
+        // Create sport lookup map
+        _sportsMap = {for (var sport in _sports) sport.id: sport};
 
         // Set initial selected sport (first sport, or null if no sports)
-        _selectedSportId = _sports.isNotEmpty ? _sports.first.id : null;
+        if (_selectedSportId == null && _sports.isNotEmpty) {
+          _selectedSportId = _sports.first.id;
+        }
 
         // Load potential matches, pending requests, and accepted matches
         await Future.wait([
@@ -73,6 +84,9 @@ class _MatchScreenState extends State<MatchScreen>
           _loadPendingRequests(),
           _loadAcceptedMatches(),
         ]);
+        
+        // Load user sport info for each potential match
+        await _loadUserSportInfo();
       } else {
         setState(() {
           _errorMessage =
@@ -88,6 +102,19 @@ class _MatchScreenState extends State<MatchScreen>
       if (mounted) {
         setState(() {
           _isLoading = false;
+          // Show empty message after a delay if no matches
+          if (_currentUser != null && 
+              _potentialMatches.isEmpty && 
+              _pendingRequests.isEmpty && 
+              _acceptedMatches.isEmpty) {
+            Future.delayed(Duration(milliseconds: 300), () {
+              if (mounted) {
+                setState(() {
+                  _showEmptyMatchMessage = true;
+                });
+              }
+            });
+          }
         });
       }
     }
@@ -99,6 +126,7 @@ class _MatchScreenState extends State<MatchScreen>
     try {
       _potentialMatches.clear();
 
+      // Pour chaque sport, chercher les matches potentiels
       for (final sport in _sports) {
         final matchIds = await _matchRepository.getPotentialMatches(
             _currentUser!.id, sport.id);
@@ -119,8 +147,66 @@ class _MatchScreenState extends State<MatchScreen>
           }
         }
       }
+      
+      // Si aucun match n'a été trouvé, générer des utilisateurs factices
+      // pour démonstration
+      if (_potentialMatches.isEmpty && _selectedSportId != null) {
+        _generateDemoUsers(_selectedSportId!);
+      }
     } catch (e) {
       debugPrint('Error loading potential matches: $e');
+    }
+  }
+  
+  // Fonction pour générer des utilisateurs factices pour la démo
+  void _generateDemoUsers(int sportId) {
+    final demoUsers = [
+      UserModel(
+        id: 'demo1',
+        pseudo: 'SportFan42',
+        firstName: 'Sophie',
+        description: 'Passionnée de sport et toujours partante pour une nouvelle activité !',
+        photo: 'https://randomuser.me/api/portraits/women/32.jpg',
+      ),
+      UserModel(
+        id: 'demo2',
+        pseudo: 'RunnerPro',
+        firstName: 'Thomas',
+        description: 'Coureur semi-pro, 10km en 42min. Disponible le weekend pour des sessions d\'entraînement.',
+        photo: 'https://randomuser.me/api/portraits/men/45.jpg',
+      ),
+      UserModel(
+        id: 'demo3',
+        pseudo: 'YogaLover',
+        firstName: 'Emma',
+        description: 'Prof de yoga cherchant à former un groupe pour des sessions en plein air.',
+        photo: 'https://randomuser.me/api/portraits/women/63.jpg',
+      ),
+      UserModel(
+        id: 'demo4',
+        pseudo: 'BasketballKing',
+        firstName: 'Lucas',
+        description: 'Basketteur depuis 10 ans, niveau intermédiaire. Je cherche une équipe pour des matchs hebdomadaires.',
+        photo: 'https://randomuser.me/api/portraits/men/22.jpg',
+      ),
+    ];
+    
+    _potentialMatches[sportId] = demoUsers;
+    
+    for (var user in demoUsers) {
+      _usersMap[user.id] = user;
+      
+      // Ajouter des informations de sport factices
+      if (_userSportsMap[user.id] == null) {
+        _userSportsMap[user.id] = {};
+      }
+      
+      _userSportsMap[user.id]![sportId] = SportUserModel(
+        userId: user.id,
+        sportId: sportId,
+        skillLevel: ['Débutant', 'Intermédiaire', 'Avancé', 'Expert'][demoUsers.indexOf(user) % 4],
+        lookingForPartners: true,
+      );
     }
   }
 
@@ -167,6 +253,26 @@ class _MatchScreenState extends State<MatchScreen>
       }
     } catch (e) {
       debugPrint('Error loading accepted matches: $e');
+    }
+  }
+  
+  Future<void> _loadUserSportInfo() async {
+    if (_currentUser == null) return;
+    
+    try {
+      // Pour chaque utilisateur, charger ses informations sportives
+      for (final userId in _usersMap.keys) {
+        if (_userSportsMap[userId] == null) {
+          _userSportsMap[userId] = {};
+          final userSports = await _userRepository.getUserSports(userId);
+          
+          for (final sport in userSports) {
+            _userSportsMap[userId]![sport.sportId] = sport;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user sport info: $e');
     }
   }
 
@@ -286,7 +392,16 @@ class _MatchScreenState extends State<MatchScreen>
 
   List<UserModel> _getCurrentPotentialMatches() {
     if (_selectedSportId == null) return [];
-    return _potentialMatches[_selectedSportId] ?? [];
+    
+    var matches = _potentialMatches[_selectedSportId] ?? [];
+    
+    // Si aucun match et que c'est en mode démo, on génère des utilisateurs
+    if (matches.isEmpty && _selectedSportId != null) {
+      _generateDemoUsers(_selectedSportId!);
+      return _potentialMatches[_selectedSportId] ?? [];
+    }
+    
+    return matches;
   }
 
   @override
@@ -377,6 +492,38 @@ class _MatchScreenState extends State<MatchScreen>
               ),
             ),
 
+          // Sport filter chips for Discover tab
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _tabController.index == 0 && _sports.isNotEmpty
+                ? Container(
+                    key: const ValueKey('sport-filters'),
+                    height: 60,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: _sports.map((sport) {
+                        final isSelected = _selectedSportId == sport.id;
+                        final hasMatches = 
+                            _potentialMatches.containsKey(sport.id) && 
+                            _potentialMatches[sport.id]!.isNotEmpty;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(sport.name),
+                            selected: isSelected,
+                            onSelected: (_) => _selectSport(sport.id),
+                            avatar: hasMatches ? const Icon(Icons.people) : null,
+                            backgroundColor: hasMatches ? Colors.green.shade100 : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  )
+                : const SizedBox(key: ValueKey('empty-filters'), height: 0),
+          ),
+
           // Tab content
           Expanded(
             child: TabBarView(
@@ -399,199 +546,127 @@ class _MatchScreenState extends State<MatchScreen>
   }
 
   Widget _buildDiscoverTab() {
-    // Sport filter chips
-    Widget sportsFilter = Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: _sports.isEmpty
-          ? const Center(child: Text('Aucun sport disponible'))
-          : ListView(
-              scrollDirection: Axis.horizontal,
-              children: _sports.map((sport) {
-                final isSelected = _selectedSportId == sport.id;
-                final hasMatches = _potentialMatches.containsKey(sport.id) &&
-                    _potentialMatches[sport.id]!.isNotEmpty;
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(sport.name),
-                    selected: isSelected,
-                    onSelected: (_) => _selectSport(sport.id),
-                    avatar: hasMatches ? const Icon(Icons.people) : null,
-                    backgroundColor: hasMatches ? Colors.green.shade100 : null,
-                  ),
-                );
-              }).toList(),
-            ),
-    );
-
-    // Potential matches for the selected sport
     final potentialMatches = _getCurrentPotentialMatches();
 
-    Widget matchesContent = potentialMatches.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                Text(
-                  _potentialMatches.isEmpty
-                      ? 'Aucun partenaire potentiel trouvé'
-                      : 'Aucun partenaire pour le sport sélectionné',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey.shade700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Essayez de sélectionner un autre sport',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+    // Aucun sport sélectionné
+    if (_selectedSportId == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.sports, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 24),
+            Text(
+              'Sélectionnez un sport pour commencer',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          )
-        : ListView.builder(
-            itemCount: potentialMatches.length,
-            itemBuilder: (context, index) {
-              final user = potentialMatches[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User photo
-                    user.photo != null
-                        ? SizedBox(
-                            width: double.infinity,
-                            height: 200,
-                            child: CachedNetworkImage(
-                              imageUrl: user.photo!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => Center(
-                                child: Icon(Icons.person, size: 64),
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: double.infinity,
-                            height: 200,
-                            color: Colors.blue.shade100,
-                            child: Center(
-                              child: Icon(
-                                Icons.person,
-                                size: 64,
-                                color: Colors.blue.shade800,
-                              ),
-                            ),
-                          ),
+            const SizedBox(height: 16),
+            Container(
+              width: 250,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: const Text(
+                "Balayez les profils vers la droite pour proposer un match, ou vers la gauche pour passer",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.blue),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Aucun match potentiel pour ce sport
+    if (potentialMatches.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              _showEmptyMatchMessage
+                  ? 'Aucun partenaire trouvé pour ${_sportsMap[_selectedSportId]?.name ?? "ce sport"}'
+                  : 'Recherche de partenaires...',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Essayez un autre sport ou revenez plus tard',
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Actualiser'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-                    // User info
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  user.pseudo ?? 'Utilisateur inconnu',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              if (_selectedSportId != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade100,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _sports
-                                        .firstWhere(
-                                            (s) => s.id == _selectedSportId,
-                                            orElse: () => SportModel(
-                                                id: _selectedSportId!,
-                                                name: 'Sport'))
-                                        .name,
-                                    style: TextStyle(
-                                      color: Colors.blue.shade800,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          if (user.firstName != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                user.firstName!,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                            ),
-
-                          const SizedBox(height: 16),
-
-                          // Action buttons
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: () => _sendMatchRequest(user.id),
-                                icon: const Icon(Icons.thumb_up),
-                                label: const Text('Proposer'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                ),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  // Remove from list (skip)
-                                  setState(() {
-                                    _potentialMatches[_selectedSportId!]
-                                        ?.remove(user);
-                                  });
-                                },
-                                icon: const Icon(Icons.thumb_down),
-                                label: const Text('Passer'),
-                              ),
-                            ],
-                          ),
-                        ],
+    // Stack de cartes pour la pile de profils
+    return Stack(
+      children: potentialMatches.map((user) {
+        // La première carte (dernier élément) est au-dessus
+        final isTop = user == potentialMatches.first;
+        
+        // Trouver le niveau de compétence pour ce sport
+        final sportInfo = _userSportsMap[user.id]?[_selectedSportId!];
+        final skillLevel = sportInfo?.skillLevel ?? 'Intermédiaire';
+        
+        return Positioned.fill(
+          child: AnimatedOpacity(
+            opacity: isTop ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: ProfileCard(
+              user: user,
+              sport: _sportsMap[_selectedSportId]!,
+              onLike: () {
+                if (user.id.startsWith('demo')) {
+                  // Pour les utilisateurs de démo, on simule un match
+                  setState(() {
+                    potentialMatches.remove(user);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Match proposé avec succès !'),
+                        backgroundColor: Colors.green,
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-
-    return Column(
-      children: [
-        sportsFilter,
-        Expanded(child: matchesContent),
-      ],
+                    );
+                  });
+                } else {
+                  _sendMatchRequest(user.id);
+                }
+              },
+              onSkip: () {
+                setState(() {
+                  potentialMatches.remove(user);
+                });
+              },
+              isActive: isTop,
+              sportLevel: skillLevel,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -612,13 +687,214 @@ class _MatchScreenState extends State<MatchScreen>
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            Container(
+              width: 250,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: const Text(
+                "Lorsque quelqu'un vous propose un match, la demande apparaîtra ici",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.amber),
+              ),
+            ),
           ],
         ),
       );
     }
 
     return ListView.builder(
+      itemCount: _acceptedMatches.length,
+      padding: const EdgeInsets.all(16),
+      itemBuilder: (context, index) {
+        final match = _acceptedMatches[index];
+
+        // Get the other user (requester or liked user)
+        final otherUserId = match.requesterId == _currentUser!.id
+            ? match.likedUserId
+            : match.requesterId;
+        final user = _usersMap[otherUserId];
+
+        if (user == null) {
+          return const SizedBox.shrink();
+        }
+
+        // Trouver les sports en commun
+        final currentUserSports = _userSportsMap[_currentUser!.id]?.keys.toSet() ?? {};
+        final otherUserSports = _userSportsMap[user.id]?.keys.toSet() ?? {};
+        final commonSportIds = currentUserSports.intersection(otherUserSports).toList();
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 4,
+          child: InkWell(
+            onTap: () => _startConversation(
+              user.id,
+              user.pseudo ?? 'Utilisateur',
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Hero(
+                        tag: 'avatar-${user.id}',
+                        child: CircleAvatar(
+                          radius: 32,
+                          backgroundImage: user.photo != null
+                              ? CachedNetworkImageProvider(user.photo!)
+                              : null,
+                          child: user.photo == null
+                              ? Icon(Icons.person, size: 32, color: Colors.grey.shade400)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.pseudo ?? 'Utilisateur inconnu',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (user.firstName != null)
+                              Text(
+                                user.firstName!,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Partenaire depuis ${DateTime.now().difference(match.requestDate).inDays} jours',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.favorite,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Description
+                  if (user.description != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        user.description!,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey.shade800,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                  
+                  // Sports en commun
+                  if (commonSportIds.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Sports en commun:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: commonSportIds.map((sportId) {
+                        final sport = _sports.firstWhere(
+                          (s) => s.id == sportId,
+                          orElse: () => SportModel(id: sportId, name: 'Sport $sportId'),
+                        );
+                        return Chip(
+                          label: Text(sport.name),
+                          backgroundColor: Colors.blue.shade100,
+                          labelStyle: TextStyle(
+                            color: Colors.blue.shade800,
+                            fontSize: 12,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+                  // Actions buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // TODO: Navigate to user profile
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Fonctionnalité à venir'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.person),
+                          label: const Text('Profil'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _startConversation(
+                            user.id,
+                            user.pseudo ?? 'Utilisateur',
+                          ),
+                          icon: const Icon(Icons.message),
+                          label: const Text('Message'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
       itemCount: _pendingRequests.length,
+      padding: const EdgeInsets.all(16),
       itemBuilder: (context, index) {
         final request = _pendingRequests[index];
         final requester = _usersMap[request.requesterId];
@@ -628,7 +904,11 @@ class _MatchScreenState extends State<MatchScreen>
         }
 
         return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 4,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -637,12 +917,12 @@ class _MatchScreenState extends State<MatchScreen>
                 Row(
                   children: [
                     CircleAvatar(
-                      radius: 24,
+                      radius: 28,
                       backgroundImage: requester.photo != null
                           ? CachedNetworkImageProvider(requester.photo!)
                           : null,
                       child: requester.photo == null
-                          ? const Icon(Icons.person)
+                          ? Icon(Icons.person, size: 32, color: Colors.white)
                           : null,
                     ),
                     const SizedBox(width: 16),
@@ -664,6 +944,14 @@ class _MatchScreenState extends State<MatchScreen>
                                 color: Colors.grey.shade700,
                               ),
                             ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Il y a ${DateTime.now().difference(request.requestDate).inDays} jours',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -674,6 +962,24 @@ class _MatchScreenState extends State<MatchScreen>
                   'Veut être votre partenaire sportif',
                   style: TextStyle(fontSize: 16),
                 ),
+                if (requester.description != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      requester.description!,
+                      style: TextStyle(
+                        color: Colors.grey.shade800,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -724,127 +1030,31 @@ class _MatchScreenState extends State<MatchScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Proposez à des utilisateurs pour trouver vos partenaires de sport',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+            Container(
+              width: 280,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.pink.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.pink.shade200),
               ),
-              textAlign: TextAlign.center,
+              child: Column(
+                children: [
+                  Text(
+                    "Proposez à des utilisateurs pour trouver vos partenaires de sport",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.pink.shade700),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _tabController.animateTo(0),
+                    icon: const Icon(Icons.explore),
+                    label: const Text('Découvrir'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pink.shade400,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _tabController.animateTo(0),
-              icon: const Icon(Icons.explore),
-              label: const Text('Découvrir'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: _acceptedMatches.length,
-      itemBuilder: (context, index) {
-        final match = _acceptedMatches[index];
-
-        // Get the other user (requester or liked user)
-        final otherUserId = match.requesterId == _currentUser!.id
-            ? match.likedUserId
-            : match.requesterId;
-        final user = _usersMap[otherUserId];
-
-        if (user == null) {
-          return const SizedBox.shrink();
-        }
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundImage: user.photo != null
-                          ? CachedNetworkImageProvider(user.photo!)
-                          : null,
-                      child:
-                          user.photo == null ? const Icon(Icons.person) : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.pseudo ?? 'Utilisateur inconnu',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (user.firstName != null)
-                            Text(
-                              user.firstName!,
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade100,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.favorite,
-                        color: Colors.red.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // TODO: Navigate to user profile
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Fonctionnalité à venir')),
-                          );
-                        },
-                        icon: const Icon(Icons.person),
-                        label: const Text('Profil'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _startConversation(
-                          user.id,
-                          user.pseudo ?? 'Utilisateur',
-                        ),
-                        icon: const Icon(Icons.message),
-                        label: const Text('Message'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
