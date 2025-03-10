@@ -261,11 +261,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           decoration: BoxDecoration(
                                             color: Colors.blue.shade100,
                                             shape: BoxShape.circle,
-                                            image: _user.photo != null
+                                            image: _user?.photo != null
                                                 ? DecorationImage(
                                                     image:
                                                         CachedNetworkImageProvider(
-                                                            _user.photo!),
+                                                            _user!.photo!),
                                                     fit: BoxFit.cover,
                                                   )
                                                 : null,
@@ -278,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                             ],
                                           ),
-                                          child: _user.photo == null
+                                          child: _user?.photo == null
                                               ? Icon(
                                                   Icons.person,
                                                   size: 60,
@@ -310,15 +310,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              '@${_user.pseudo ?? "Sans pseudo"}',
+                              '@${_user?.pseudo ?? "Sans pseudo"}',
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if (_user.firstName != null)
+                            if (_user?.firstName != null)
                               Text(
-                                _user.firstName!,
+                                _user?.firstName ?? '',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey,
@@ -331,8 +331,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 24),
 
                       // Description
-                      if (_user.description != null &&
-                          _user.description!.isNotEmpty) ...[
+                      if (_user?.description != null &&
+                          (_user?.description ?? '').isNotEmpty) ...[
                         const Text(
                           'À propos',
                           style: TextStyle(
@@ -345,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(_user.description!),
+                          child: Text(_user?.description ?? ''),
                         ),
                         const SizedBox(height: 24),
                       ],

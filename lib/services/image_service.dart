@@ -1,5 +1,6 @@
 // lib/services/image_service.dart
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
@@ -18,8 +19,20 @@ class ImageService {
       final fileName =
           'profile_${userId}_${const Uuid().v4()}$fileExt'; // Génère un nom unique
 
-      // Téléchargement dans le bucket 'profiles'
-      await _supabase.storage.from('profiles').upload(fileName, imageFile);
+      // Pour le web, on doit utiliser une approche différente
+      if (kIsWeb) {
+        // Lire le fichier en bytes
+        final bytes = await imageFile.readAsBytes();
+        // Téléchargement dans le bucket 'profiles'
+        await _supabase.storage.from('profiles').uploadBinary(fileName, bytes);
+      } else {
+        // Pour mobile
+        final bytes = await imageFile.readAsBytes();
+        await _supabase.storage.from('profiles').uploadBinary(
+              fileName,
+              bytes,
+            );
+      }
 
       // Construction de l'URL publique
       final imageUrl =
@@ -58,8 +71,22 @@ class ImageService {
       final fileExt = path.extension(imageFile.path);
       final fileName = 'facility_${facilityId}_${const Uuid().v4()}$fileExt';
 
-      // Téléchargement dans le bucket 'facilities'
-      await _supabase.storage.from('facilities').upload(fileName, imageFile);
+      // Pour le web, on doit utiliser une approche différente
+      if (kIsWeb) {
+        // Lire le fichier en bytes
+        final bytes = await imageFile.readAsBytes();
+        // Téléchargement dans le bucket 'facilities'
+        await _supabase.storage
+            .from('facilities')
+            .uploadBinary(fileName, bytes);
+      } else {
+        // Pour mobile
+        final bytes = await imageFile.readAsBytes();
+        await _supabase.storage.from('facilities').uploadBinary(
+              fileName,
+              bytes,
+            );
+      }
 
       // Construction de l'URL publique
       final imageUrl =
@@ -79,7 +106,6 @@ class ImageService {
       await _supabase
           .from('app_user')
           .update({'photo': photoUrl}).eq('id', userId);
-
       return true;
     } catch (e) {
       debugPrint('Erreur lors de la mise à jour de la photo de profil: $e');

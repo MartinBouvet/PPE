@@ -1,4 +1,6 @@
 // lib/models/facility_model.dart
+import 'dart:math' as math;
+
 class SportFacilityModel {
   final int id;
   final String name;
@@ -71,25 +73,28 @@ class SportFacilityModel {
   }
 
   // Calculer la distance depuis la position actuelle (à implémenter avec la géolocalisation)
+  // Formule de distance haversine pour calculer la distance entre deux points sur une sphère
   double calculateDistance(double userLat, double userLng) {
-    // Formule de distance approximative (remplacer par une formule de distance haversine pour plus de précision)
-    // Cette méthode simple permettra d'avoir un ordre de grandeur de la distance en kms
     const double earthRadius = 6371; // rayon de la terre en km
-    double latDiff = _toRadians(userLat - latitude);
-    double lngDiff = _toRadians(userLng - longitude);
+    final latDiff = _toRadians(userLat - latitude);
+    final lngDiff = _toRadians(userLng - longitude);
 
-    double a = (latDiff / 2).sin() * (latDiff / 2).sin() +
-        (userLat).cos() *
-            (latitude).cos() *
-            (lngDiff / 2).sin() *
-            (lngDiff / 2).sin();
-    double c = 2 * (a.sqrt()).asin();
+    final userLatRad = _toRadians(userLat);
+    final facilityLatRad = _toRadians(latitude);
+
+    final a = math.sin(latDiff / 2) * math.sin(latDiff / 2) +
+        math.cos(userLatRad) *
+            math.cos(facilityLatRad) *
+            math.sin(lngDiff / 2) *
+            math.sin(lngDiff / 2);
+
+    final c = 2 * math.asin(math.sqrt(a));
 
     return earthRadius * c;
   }
 
   double _toRadians(double degree) {
-    return degree * (3.14159265359 / 180);
+    return degree * (math.pi / 180);
   }
 
   // Vérifier si le lieu propose un sport spécifique
