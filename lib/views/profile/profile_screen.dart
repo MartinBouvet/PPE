@@ -11,6 +11,7 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../services/image_service.dart';
+import '../../utils/test_data_initializer.dart'; // Ajout de l'import ici
 import 'edit_profile_screen.dart';
 import 'sport_selection_screen.dart';
 
@@ -155,6 +156,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (result == true) {
       // Si des modifications ont été faites, recharger les données
       _loadUserData();
+    }
+  }
+
+  // Nouvelle méthode pour initialiser les données de test
+  Future<void> _initializeTestData() async {
+    try {
+      // Afficher un indicateur de chargement
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Initialisation des données de test...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Initialiser toutes les données de test
+      final result = await TestDataInitializer.initializeAllTestData();
+
+      // Fermer la boîte de dialogue
+      if (mounted) Navigator.pop(context);
+
+      // Afficher un message de succès ou d'erreur
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result
+                ? 'Données de test initialisées avec succès'
+                : 'Échec de l\'initialisation des données de test'),
+            backgroundColor: result ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Fermer la boîte de dialogue en cas d'erreur
+      if (mounted) Navigator.pop(context);
+
+      // Afficher l'erreur
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -567,6 +622,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               leading: const Icon(Icons.help_outline),
                               title: const Text('Aide et support'),
                               onTap: () {},
+                            ),
+                            // Ajout du bouton Admin ici
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.admin_panel_settings),
+                              title:
+                                  const Text('Initialiser les données de test'),
+                              subtitle: const Text(
+                                  'Ajoute des utilisateurs et des lieux fictifs'),
+                              onTap: _initializeTestData,
                             ),
                           ],
                         ),

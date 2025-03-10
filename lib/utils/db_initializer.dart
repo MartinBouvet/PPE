@@ -105,18 +105,45 @@ class DbInitializer {
           await _supabase.from('sport').select('id_sport').limit(1);
 
       if (sportsCount.isEmpty) {
-        // Ajouter quelques sports de base
+        // Ajouter quelques sports de base avec des IDs spécifiques
         final basicSports = [
-          {'name': 'Football', 'description': 'Sport collectif de ballon'},
-          {'name': 'Tennis', 'description': 'Sport de raquette'},
-          {'name': 'Basketball', 'description': 'Sport collectif de ballon'},
-          {'name': 'Natation', 'description': 'Sport aquatique'},
-          {'name': 'Running', 'description': 'Course à pied'},
-          {'name': 'Yoga', 'description': 'Activité de bien-être'},
-          {'name': 'Cyclisme', 'description': 'Sport de vélo'},
+          {
+            'id_sport': 1,
+            'name': 'Basketball',
+            'description': 'Sport collectif de ballon'
+          },
+          {'id_sport': 2, 'name': 'Tennis', 'description': 'Sport de raquette'},
+          {
+            'id_sport': 3,
+            'name': 'Football',
+            'description': 'Sport collectif de ballon'
+          },
+          {'id_sport': 4, 'name': 'Running', 'description': 'Course à pied'},
+          {
+            'id_sport': 5,
+            'name': 'Randonnée',
+            'description': 'Marche en nature'
+          },
+          {
+            'id_sport': 6,
+            'name': 'Yoga',
+            'description': 'Activité de bien-être'
+          },
+          {'id_sport': 7, 'name': 'Escalade', 'description': 'Sport de grimpe'},
+          {'id_sport': 8, 'name': 'Natation', 'description': 'Sport aquatique'},
+          {
+            'id_sport': 9,
+            'name': 'Course à pied',
+            'description': 'Sport de course'
+          },
+          {
+            'id_sport': 10,
+            'name': 'Yoga en plein air',
+            'description': 'Yoga pratiqué en extérieur'
+          },
         ];
 
-        await _supabase.from('sport').insert(basicSports);
+        await _supabase.from('sport').upsert(basicSports);
         debugPrint('Sports de base ajoutés');
       }
     } catch (e) {
