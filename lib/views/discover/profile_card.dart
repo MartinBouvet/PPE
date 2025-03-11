@@ -153,6 +153,9 @@ class _ProfileCardState extends State<ProfileCard>
     });
   }
 
+  // lib/views/discover/profile_card.dart - MODIFICATION PARTIELLE
+
+// Modifiez le build de la classe ProfileCard pour gérer correctement les images
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -196,19 +199,18 @@ class _ProfileCardState extends State<ProfileCard>
                     // Photo de profil
                     Positioned.fill(
                       child: widget.user.photo != null
-                          ? CachedNetworkImage(
-                              imageUrl: widget.user.photo!,
+                          ? Image.network(
+                              widget.user.photo!,
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey.shade200,
-                                child: const Center(
-                                    child: CircularProgressIndicator()),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(Icons.person,
-                                    size: 80, color: Colors.grey.shade800),
-                              ),
+                              errorBuilder: (context, error, stackTrace) {
+                                debugPrint(
+                                    "Erreur de chargement d'image: $error");
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(Icons.person,
+                                      size: 80, color: Colors.grey.shade800),
+                                );
+                              },
                             )
                           : Container(
                               color: Colors.grey.shade200,

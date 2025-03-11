@@ -39,12 +39,13 @@ class DbInitializer {
   }
 
   /// Vérifie si une table existe dans la base de données
+  /// Vérifie si une table existe dans la base de données
   static Future<bool> _tableExists(String tableName) async {
     try {
-      // Cette requête est spécifique à PostgreSQL
+      // Remplacer cette partie par le nouvel appel RPC
       final result = await _supabase.rpc(
-        'check_if_table_exists',
-        params: {'table_name': tableName},
+        'check_table_exists', // Nouveau nom de fonction
+        params: {'table_name_param': tableName}, // Paramètre renommé
       );
 
       // Si la fonction RPC n'existe pas, on utilise une approche plus basique

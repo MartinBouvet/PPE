@@ -127,6 +127,11 @@ class _FacilityScreenState extends State<FacilityScreen> {
   // Reste du code inchangé
 
   List<SportFacilityModel> _getFilteredFacilities() {
+    // Si aucune installation n'est disponible, utiliser les installations factices
+    if (_facilities.isEmpty) {
+      _facilities = _generateMockFacilities();
+    }
+
     return _facilities.where((facility) {
       // Filtre de recherche par nom ou adresse
       final nameMatches =
@@ -149,6 +154,98 @@ class _FacilityScreenState extends State<FacilityScreen> {
     }).toList();
   }
 
+  List<SportFacilityModel> _generateMockFacilities() {
+    debugPrint("Génération d'installations sportives factices");
+    return [
+      SportFacilityModel(
+        id: 1,
+        name: 'Centre Sportif Émile Anthoine',
+        address: '9 Rue Jean Rey, 75015 Paris',
+        arrondissement: '15ème',
+        latitude: 48.8567,
+        longitude: 2.2897,
+        photoUrl:
+            'https://media.istockphoto.com/id/1311303481/photo/basketball-gym.jpg?s=612x612&w=0&k=20&c=ZJ4avELfbxhAYkTZKP-LmYPDH7wK2mglEJ_Tz9ArGPw=',
+        description:
+            'Centre sportif proposant plusieurs équipements dont un gymnase, un terrain de football et des espaces de fitness.',
+        openingHours: 'Lun-Ven: 8h-22h, Sam-Dim: 9h-20h',
+        priceRange: '5€-15€',
+        website:
+            'https://www.paris.fr/equipements/centre-sportif-emile-anthoine-2329',
+        phone: '01 45 75 54 90',
+        sportIds: [1, 3, 6, 9],
+      ),
+      SportFacilityModel(
+        id: 2,
+        name: 'Piscine Armand Massard',
+        address: '66 Boulevard du Montparnasse, 75015 Paris',
+        arrondissement: '15ème',
+        latitude: 48.8432,
+        longitude: 2.3209,
+        photoUrl:
+            'https://media.istockphoto.com/id/864327070/photo/swimming-lanes.jpg?s=612x612&w=0&k=20&c=1KJnkLwqa7U3CwVxeXQEXL-XQSIfqeV5wfP-BfE9vu0=',
+        description:
+            'Piscine municipale avec un bassin de 25 mètres et des cours collectifs.',
+        openingHours: 'Lun-Ven: 7h-22h, Sam-Dim: 8h-19h',
+        priceRange: '3€-5€',
+        website: 'https://www.paris.fr/equipements/piscine-armand-massard-2930',
+        phone: '01 45 38 65 28',
+        sportIds: [4],
+      ),
+      SportFacilityModel(
+        id: 3,
+        name: 'Tennis Club Frédéric Sarazin',
+        address: '99 Boulevard Kellermann, 75015 Paris',
+        arrondissement: '15ème',
+        latitude: 48.8188,
+        longitude: 2.3401,
+        photoUrl:
+            'https://media.istockphoto.com/id/139962036/photo/tennis-court.jpg?s=612x612&w=0&k=20&c=J5LskGbaQpZqfDYKJlHkQRMcnOuTkDLUSLAhg8ETZ8U=',
+        description:
+            'Club de tennis avec courts couverts et découverts, proposant des cours et la location de terrains.',
+        openingHours: 'Tous les jours: 8h-22h',
+        priceRange: '15€-25€/heure',
+        website: 'https://www.paris.fr/equipements/tennis-sarazin-2475',
+        phone: '01 47 34 74 81',
+        sportIds: [2],
+      ),
+      SportFacilityModel(
+        id: 4,
+        name: 'Gymnase Cévennes',
+        address: '11 Rue des Cévennes, 75015 Paris',
+        arrondissement: '15ème',
+        latitude: 48.8416,
+        longitude: 2.2796,
+        photoUrl:
+            'https://media.istockphoto.com/id/170096587/photo/empty-basketball-court.jpg?s=612x612&w=0&k=20&c=jCKwAkx-Vcic4CKfTVGh4n4T-MgJnVw52O7FV5Xptxo=',
+        description:
+            'Gymnase municipal proposant plusieurs activités sportives, notamment le basketball et le volleyball.',
+        openingHours: 'Lun-Ven: 9h-22h, Sam: 9h-19h, Dim: 9h-17h',
+        priceRange: 'Gratuit-10€',
+        website: 'https://www.paris.fr/equipements/gymnase-cevennes-8044',
+        phone: '01 45 57 28 59',
+        sportIds: [1, 5],
+      ),
+      SportFacilityModel(
+        id: 5,
+        name: 'Stade Suzanne Lenglen',
+        address: '2 Rue Louis Armand, 75015 Paris',
+        arrondissement: '15ème',
+        latitude: 48.8314,
+        longitude: 2.2775,
+        photoUrl:
+            'https://media.istockphoto.com/id/468841758/photo/soccer-stadium.jpg?s=612x612&w=0&k=20&c=KLbMuBhW2oehmXMVU5hPdvUzXpqXuZ4xGNr5LH-hkqw=',
+        description:
+            'Grand complexe sportif avec terrains de football, courts de tennis, piste d\'athlétisme et salles de fitness.',
+        openingHours: 'Lun-Dim: 8h-22h',
+        priceRange: '5€-20€',
+        website: 'https://www.paris.fr/equipements/stade-suzanne-lenglen-2677',
+        phone: '01 58 14 20 00',
+        sportIds: [1, 2, 3, 9],
+      ),
+    ];
+  }
+
   // Méthode pour calculer une distance aléatoire mais cohérente pour chaque installation
   double _getRandomDistance(int facilityId) {
     // Utiliser l'ID comme seed pour avoir la même valeur à chaque fois
@@ -159,15 +256,15 @@ class _FacilityScreenState extends State<FacilityScreen> {
   // Méthode pour obtenir une image aléatoire si l'installation n'en a pas
   String _getDefaultImage(int sportId) {
     final sportImages = {
-      1: 'https://images.unsplash.com/photo-1505666287802-931dc83a0fe4', // Basketball
-      2: 'https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534', // Tennis
-      3: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68', // Football
-      4: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571', // Natation
-      5: 'https://images.unsplash.com/photo-1551632811-561732d1e306', // Randonnée
-      6: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b', // Yoga
-      7: 'https://images.unsplash.com/photo-1564769662533-4f00a87b4056', // Escalade
-      8: 'https://images.unsplash.com/photo-1541904845501-0d2077efd264', // Fitness
-      9: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8', // Course à pied
+      1: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/1.jpg', // Basketball
+      2: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/2.jpg', // Tennis
+      3: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/3.jpg', // Football
+      4: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/4.jpg', // Natation
+      5: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/5.jpg', // Randonnée
+      6: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/6.jpg', // Yoga
+      7: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/7.jpg', // Escalade
+      8: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/8.jpg', // Fitness
+      9: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/8.jpg', // Course à pied
     };
 
     if (sportId > 0 && sportImages.containsKey(sportId)) {
@@ -175,7 +272,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
     }
 
     // Image par défaut
-    return 'https://images.unsplash.com/photo-1470468969717-61d5d54fd036?w=800&q=80';
+    return 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/logo.png';
   }
 
   // Format de prix en euros
