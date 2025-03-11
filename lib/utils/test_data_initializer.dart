@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import '../config/supabase_config.dart';
 import '../repositories/facility_repository.dart';
+import '../repositories/sport_repository.dart';
 import '../utils/db_initializer.dart';
 
 class TestDataInitializer {
@@ -10,8 +11,18 @@ class TestDataInitializer {
   // Méthode principale pour initialiser toutes les données de test
   static Future<bool> initializeAllTestData() async {
     try {
+      // Vérifier si la base de données existe et est accessible
+      bool dbExists = await _checkDatabaseConnection();
+
+      if (!dbExists) {
+        debugPrint(
+            'Impossible d\'accéder à la base de données, utilisation de données factices');
+        return false;
+      }
+
       await DbInitializer
           .initializeBasicData(); // Initialiser les sports de base
+      await initializeSports(); // S'assurer que les sports sont bien initialisés
       await initializeTestFacilities(); // Initialiser les installations sportives
       await initializeTestUsers(); // Initialiser les utilisateurs test
       await initializeTestUserSports(); // Initialiser les sports des utilisateurs
@@ -20,6 +31,85 @@ class TestDataInitializer {
       return true;
     } catch (e) {
       debugPrint('Erreur lors de l\'initialisation des données de test: $e');
+      return false;
+    }
+  }
+
+  // Vérifier si la connexion à la base de données fonctionne
+  static Future<bool> _checkDatabaseConnection() async {
+    try {
+      // Test simple pour vérifier si on peut accéder à Supabase
+      await _supabase.from('sport').select('count').limit(1);
+      return true;
+    } catch (e) {
+      debugPrint('Erreur de connexion à la base de données: $e');
+      return false;
+    }
+  }
+
+  // Initialiser les sports de base (s'ils n'existent pas déjà)
+  static Future<bool> initializeSports() async {
+    try {
+      // Vérifier si des sports existent déjà
+      final existingSports =
+          await _supabase.from('sport').select('id_sport').limit(1);
+
+      if (existingSports.isNotEmpty) {
+        debugPrint('Des sports existent déjà dans la base de données');
+        return true;
+      }
+
+      // Liste des sports à créer
+      final sports = [
+        {
+          'id_sport': 1,
+          'name': 'Basketball',
+          'description': 'Sport collectif de ballon'
+        },
+        {'id_sport': 2, 'name': 'Tennis', 'description': 'Sport de raquette'},
+        {
+          'id_sport': 3,
+          'name': 'Football',
+          'description': 'Sport collectif de ballon'
+        },
+        {'id_sport': 4, 'name': 'Natation', 'description': 'Sport aquatique'},
+        {
+          'id_sport': 5,
+          'name': 'Volleyball',
+          'description': 'Sport collectif de ballon'
+        },
+        {
+          'id_sport': 6,
+          'name': 'Fitness',
+          'description': 'Activité de bien-être'
+        },
+        {'id_sport': 7, 'name': 'Escalade', 'description': 'Sport de grimpe'},
+        {
+          'id_sport': 8,
+          'name': 'Danse',
+          'description': 'Activité sportive artistique'
+        },
+        {
+          'id_sport': 9,
+          'name': 'Course à pied',
+          'description': 'Sport de course'
+        },
+        {
+          'id_sport': 10,
+          'name': 'Yoga en plein air',
+          'description': 'Yoga pratiqué en extérieur'
+        },
+      ];
+
+      // Insérer les sports
+      for (var sport in sports) {
+        await _supabase.from('sport').upsert(sport);
+      }
+
+      debugPrint('Sports initialisés avec succès');
+      return true;
+    } catch (e) {
+      debugPrint('Erreur lors de l\'initialisation des sports: $e');
       return false;
     }
   }

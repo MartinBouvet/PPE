@@ -1,3 +1,4 @@
+// lib/repositories/sport_repository.dart
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
@@ -15,9 +16,38 @@ class SportRepository {
           .toList();
     } catch (e) {
       debugPrint('Erreur lors de la récupération des sports: $e');
+
+      // Si erreur avec Supabase, retourner des données factices
+      if (e.toString().contains('does not exist')) {
+        return _generateMockSports();
+      }
+
       // Retourner une liste vide en cas d'erreur plutôt que de planter
       return [];
     }
+  }
+
+  // Méthode pour générer des sports factices en cas d'erreur
+  List<SportModel> _generateMockSports() {
+    return [
+      SportModel(
+          id: 1, name: 'Basketball', description: 'Sport collectif de ballon'),
+      SportModel(id: 2, name: 'Tennis', description: 'Sport de raquette'),
+      SportModel(
+          id: 3, name: 'Football', description: 'Sport collectif de ballon'),
+      SportModel(id: 4, name: 'Natation', description: 'Sport aquatique'),
+      SportModel(
+          id: 5, name: 'Volleyball', description: 'Sport collectif de ballon'),
+      SportModel(id: 6, name: 'Fitness', description: 'Activité de bien-être'),
+      SportModel(id: 7, name: 'Escalade', description: 'Sport de grimpe'),
+      SportModel(
+          id: 8, name: 'Danse', description: 'Activité sportive artistique'),
+      SportModel(id: 9, name: 'Course à pied', description: 'Sport de course'),
+      SportModel(
+          id: 10,
+          name: 'Yoga en plein air',
+          description: 'Yoga pratiqué en extérieur'),
+    ];
   }
 
   Future<SportModel?> getSportById(int sportId) async {
@@ -31,6 +61,13 @@ class SportRepository {
       return SportModel.fromJson(sport);
     } catch (e) {
       debugPrint('Erreur lors de la récupération du sport: $e');
+
+      // Si erreur, retourner un sport fictif avec cet ID
+      if (sportId >= 1 && sportId <= 10) {
+        return _generateMockSports().firstWhere((s) => s.id == sportId,
+            orElse: () => SportModel(id: sportId, name: 'Sport $sportId'));
+      }
+
       return null;
     }
   }
@@ -64,8 +101,6 @@ class SportRepository {
       return false;
     }
   }
-// Mise à jour de lib/repositories/sport_repository.dart
-// Ajouter la méthode suivante à la classe SportRepository
 
   // Supprimer un sport de l'utilisateur
   Future<bool> removeSportFromUser(String userId, int sportId) async {

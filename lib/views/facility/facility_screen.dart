@@ -1,6 +1,5 @@
 // lib/views/facility/facility_screen.dart
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math' as math;
 import '../../models/user_model.dart';
@@ -10,6 +9,7 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/facility_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../services/image_service.dart';
+import '../../utils/test_data_initializer.dart'; // Ajout de cette importation
 import 'facility_detail_screen.dart';
 
 class FacilityScreen extends StatefulWidget {
@@ -74,13 +74,23 @@ class _FacilityScreenState extends State<FacilityScreen> {
 
     try {
       _user = await _authRepository.getCurrentUser();
-      _facilities = await _facilityRepository.getAllFacilities();
+
+      // Charger les sports d'abord
       _sports = await _sportRepository.getAllSports();
+
+      // Ensuite charger les installations
+      _facilities = await _facilityRepository.getAllFacilities();
 
       // Si aucune installation n'est disponible, initialiser les données de test
       if (_facilities.isEmpty) {
-        await _facilityRepository.initializeFacilitiesData();
+        // Initialiser les données de test complètes
+        await TestDataInitializer.initializeAllTestData();
+
+        // Recharger les installations
         _facilities = await _facilityRepository.getAllFacilities();
+
+        // Recharger les sports au cas où
+        _sports = await _sportRepository.getAllSports();
       }
     } catch (e) {
       setState(() {
@@ -155,6 +165,15 @@ class _FacilityScreenState extends State<FacilityScreen> {
     }
     if (price == 'Gratuit') return price;
     return price;
+  }
+
+  // Méthode pour obtenir le nom du sport à partir de son ID
+  String _getSportName(int sportId) {
+    final sport = _sports.firstWhere(
+      (s) => s.id == sportId,
+      orElse: () => SportModel(id: sportId, name: 'Sport $sportId'),
+    );
+    return sport.name;
   }
 
   @override
@@ -525,13 +544,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                               ...facility.sportIds
                                                   .take(3)
                                                   .map((sportId) {
-                                                final sport =
-                                                    _sports.firstWhere(
-                                                  (s) => s.id == sportId,
-                                                  orElse: () => SportModel(
-                                                      id: sportId,
-                                                      name: 'Sport $sportId'),
-                                                );
+                                                final sportName =
+                                                    _getSportName(sportId);
                                                 return Padding(
                                                   padding:
                                                       const EdgeInsets.only(
@@ -549,7 +563,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
                                                               4),
                                                     ),
                                                     child: Text(
-                                                      sport.name,
+                                                      sportName,
                                                       style: TextStyle(
                                                           color: Colors
                                                               .green.shade800,
