@@ -84,20 +84,23 @@ class _FacilityScreenState extends State<FacilityScreen> {
       // Si aucune installation n'est disponible, initialiser les données de test
       if (_facilities.isEmpty || _facilities.length <= 1) {
         debugPrint("Initialisation des données de test en cours...");
-        
+
         // D'abord, initialiser les sports
         await _sportRepository.getAllSports();
-        
+
         // Initialiser les installations sportives
-        bool facilitiesInitialized = await _facilityRepository.initializeFacilitiesData();
-        debugPrint("Installations sportives initialisées: $facilitiesInitialized");
-        
+        bool facilitiesInitialized =
+            await _facilityRepository.initializeFacilitiesData();
+        debugPrint(
+            "Installations sportives initialisées: $facilitiesInitialized");
+
         // Initialiser toutes les données de test (utilisateurs, matchs, etc.)
         await TestDataInitializer.initializeAllTestData();
 
         // Recharger les installations
         _facilities = await _facilityRepository.getAllFacilities();
-        debugPrint("Nombre d'installations après initialisation: ${_facilities.length}");
+        debugPrint(
+            "Nombre d'installations après initialisation: ${_facilities.length}");
 
         // Recharger les sports au cas où
         _sports = await _sportRepository.getAllSports();
@@ -118,7 +121,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
   }
 
   // Reste du code inchangé
-  
+
   List<SportFacilityModel> _getFilteredFacilities() {
     return _facilities.where((facility) {
       // Filtre de recherche par nom ou adresse
@@ -620,3 +623,4 @@ class _FacilityScreenState extends State<FacilityScreen> {
       ),
     );
   }
+}

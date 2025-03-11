@@ -88,11 +88,12 @@ class _MatchScreenState extends State<MatchScreen>
 
         // If there are no users in the system, initialize test data
         if (_usersMap.isEmpty) {
-          debugPrint("Aucun utilisateur trouvé, initialisation des données de test...");
-          
+          debugPrint(
+              "Aucun utilisateur trouvé, initialisation des données de test...");
+
           // Try to initialize test data
           await TestDataInitializer.initializeAllTestData();
-          
+
           // Reload data after initialization
           await Future.wait([
             _loadPotentialMatches(),
@@ -178,7 +179,7 @@ class _MatchScreenState extends State<MatchScreen>
   // Fonction pour générer des utilisateurs factices pour la démo
   void _generateDemoUsers(int sportId) {
     debugPrint("Génération d'utilisateurs factices pour la démo");
-    
+
     final demoUsers = [
       UserModel(
         id: 'demo1',
@@ -236,7 +237,7 @@ class _MatchScreenState extends State<MatchScreen>
         lookingForPartners: true,
       );
     }
-    
+
     debugPrint("${demoUsers.length} utilisateurs factices générés");
   }
 
@@ -256,7 +257,7 @@ class _MatchScreenState extends State<MatchScreen>
           }
         }
       }
-      
+
       debugPrint("Nombre de demandes en attente: ${_pendingRequests.length}");
     } catch (e) {
       debugPrint('Error loading pending requests: $e');
@@ -283,7 +284,7 @@ class _MatchScreenState extends State<MatchScreen>
           }
         }
       }
-      
+
       debugPrint("Nombre de matches acceptés: ${_acceptedMatches.length}");
     } catch (e) {
       debugPrint('Error loading accepted matches: $e');
@@ -1028,6 +1029,122 @@ class _MatchScreenState extends State<MatchScreen>
                       ),
                       const SizedBox(width: 16),
                       Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.pseudo ?? 'Utilisateur inconnu',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (user.firstName != null)
+                              Text(
+                                user.firstName!,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Partenaire depuis ${DateTime.now().difference(match.requestDate).inDays} jours',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.favorite,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Description
+                  if (user.description != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        user.description!,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey.shade800,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Sports en commun
+                  if (commonSportIds.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Sports en commun:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: commonSportIds.map((sportId) {
+                        final sport = _sports.firstWhere(
+                          (s) => s.id == sportId,
+                          orElse: () =>
+                              SportModel(id: sportId, name: 'Sport $sportId'),
+                        );
+                        return Chip(
+                          label: Text(sport.name),
+                          backgroundColor: Colors.blue.shade100,
+                          labelStyle: TextStyle(
+                            color: Colors.blue.shade800,
+                            fontSize: 12,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  // Actions buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // TODO: Navigate to user profile
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Fonctionnalité à venir'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.person),
+                          label: const Text('Profil'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () => _startConversation(
                             user.id,
@@ -1047,3 +1164,4 @@ class _MatchScreenState extends State<MatchScreen>
       },
     );
   }
+}
