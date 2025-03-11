@@ -9,7 +9,7 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/facility_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../services/image_service.dart';
-import '../../utils/test_data_initializer.dart'; // Ajout de cette importation
+import '../../utils/test_data_initializer.dart';
 import 'facility_detail_screen.dart';
 
 class FacilityScreen extends StatefulWidget {
@@ -82,12 +82,22 @@ class _FacilityScreenState extends State<FacilityScreen> {
       _facilities = await _facilityRepository.getAllFacilities();
 
       // Si aucune installation n'est disponible, initialiser les données de test
-      if (_facilities.isEmpty) {
-        // Initialiser les données de test complètes
+      if (_facilities.isEmpty || _facilities.length <= 1) {
+        debugPrint("Initialisation des données de test en cours...");
+        
+        // D'abord, initialiser les sports
+        await _sportRepository.getAllSports();
+        
+        // Initialiser les installations sportives
+        bool facilitiesInitialized = await _facilityRepository.initializeFacilitiesData();
+        debugPrint("Installations sportives initialisées: $facilitiesInitialized");
+        
+        // Initialiser toutes les données de test (utilisateurs, matchs, etc.)
         await TestDataInitializer.initializeAllTestData();
 
         // Recharger les installations
         _facilities = await _facilityRepository.getAllFacilities();
+        debugPrint("Nombre d'installations après initialisation: ${_facilities.length}");
 
         // Recharger les sports au cas où
         _sports = await _sportRepository.getAllSports();
@@ -97,6 +107,7 @@ class _FacilityScreenState extends State<FacilityScreen> {
         _errorMessage =
             'Erreur lors du chargement des données: ${e.toString()}';
       });
+      debugPrint("ERREUR: $e");
     } finally {
       if (mounted) {
         setState(() {
@@ -106,6 +117,8 @@ class _FacilityScreenState extends State<FacilityScreen> {
     }
   }
 
+  // Reste du code inchangé
+  
   List<SportFacilityModel> _getFilteredFacilities() {
     return _facilities.where((facility) {
       // Filtre de recherche par nom ou adresse
@@ -607,4 +620,3 @@ class _FacilityScreenState extends State<FacilityScreen> {
       ),
     );
   }
-}

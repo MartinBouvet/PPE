@@ -28,6 +28,20 @@ class FacilityRepository {
             .add(SportFacilityModel.fromJson(facilityData, sports: sportIds));
       }
 
+      return facilities;
+    } catch (e) {
+      debugPrint(
+          'Erreur lors de la récupération des installations sportives: $e');
+
+      // En cas d'erreur, générer des données factices pour démonstration
+      if (e.toString().contains('does not exist')) {
+        return _generateMockFacilities();
+      }
+
+      return [];
+    }
+  }
+
   // Fonction d'initialisation - À UTILISER UNE SEULE FOIS pour peupler la base de données
   Future<bool> initializeFacilitiesData() async {
     try {
@@ -241,20 +255,6 @@ class FacilityRepository {
     }
   }
 
-      return facilities;
-    } catch (e) {
-      debugPrint(
-          'Erreur lors de la récupération des installations sportives: $e');
-      
-      // En cas d'erreur, générer des données factices pour démonstration
-      if (e.toString().contains('does not exist')) {
-        return _generateMockFacilities();
-      }
-      
-      return [];
-    }
-  }
-
   // Générer des données factices pour démonstration en cas d'erreur
   List<SportFacilityModel> _generateMockFacilities() {
     return [
@@ -265,11 +265,14 @@ class FacilityRepository {
         arrondissement: '15ème',
         latitude: 48.8567,
         longitude: 2.2897,
-        photoUrl: 'https://www.paris.fr/media/emile-anthoine-sdpe_34617/cover-r4x3w1000-579609ab1be56-emile-anthoine-sdpe.jpg',
-        description: 'Centre sportif proposant plusieurs équipements dont un gymnase, un terrain de football et des espaces de fitness.',
+        photoUrl:
+            'https://www.paris.fr/media/emile-anthoine-sdpe_34617/cover-r4x3w1000-579609ab1be56-emile-anthoine-sdpe.jpg',
+        description:
+            'Centre sportif proposant plusieurs équipements dont un gymnase, un terrain de football et des espaces de fitness.',
         openingHours: 'Lun-Ven: 8h-22h, Sam-Dim: 9h-20h',
         priceRange: '5€-15€',
-        website: 'https://www.paris.fr/equipements/centre-sportif-emile-anthoine-2329',
+        website:
+            'https://www.paris.fr/equipements/centre-sportif-emile-anthoine-2329',
         phone: '01 45 75 54 90',
         sportIds: [1, 3, 6, 9],
       ),
@@ -280,8 +283,10 @@ class FacilityRepository {
         arrondissement: '15ème',
         latitude: 48.8432,
         longitude: 2.3209,
-        photoUrl: 'https://www.nageurscom.com/documents/image/news/2021/piscine-armand-massard-5-bassins-parisiens-prioritaires-jep.jpg',
-        description: 'Piscine municipale avec un bassin de 25 mètres et des cours collectifs.',
+        photoUrl:
+            'https://www.nageurscom.com/documents/image/news/2021/piscine-armand-massard-5-bassins-parisiens-prioritaires-jep.jpg',
+        description:
+            'Piscine municipale avec un bassin de 25 mètres et des cours collectifs.',
         openingHours: 'Lun-Ven: 7h-22h, Sam-Dim: 8h-19h',
         priceRange: '3€-5€',
         website: 'https://www.paris.fr/equipements/piscine-armand-massard-2930',
@@ -295,8 +300,10 @@ class FacilityRepository {
         arrondissement: '15ème',
         latitude: 48.8188,
         longitude: 2.3401,
-        photoUrl: 'https://www.paris.fr/media/tennis-4_115886/cover-r4x3w1000-5f7452f3d54b8-tennis-courts-courts-67533.jpg',
-        description: 'Club de tennis avec courts couverts et découverts, proposant des cours et la location de terrains.',
+        photoUrl:
+            'https://www.paris.fr/media/tennis-4_115886/cover-r4x3w1000-5f7452f3d54b8-tennis-courts-courts-67533.jpg',
+        description:
+            'Club de tennis avec courts couverts et découverts, proposant des cours et la location de terrains.',
         openingHours: 'Tous les jours: 8h-22h',
         priceRange: '15€-25€/heure',
         website: 'https://www.paris.fr/equipements/tennis-sarazin-2475',
@@ -310,8 +317,10 @@ class FacilityRepository {
         arrondissement: '15ème',
         latitude: 48.8416,
         longitude: 2.2796,
-        photoUrl: 'https://www.leparisien.fr/resizer/s2oI075W3qw7Lw-bFJbX52YVS8s=/622x389/cloudfront-eu-central-1.images.arcpublishing.com/leparisien/F2ZK7FTFPRDBDCCXXZVKWMX4LE.jpg',
-        description: 'Gymnase municipal proposant plusieurs activités sportives, notamment le basketball et le volleyball.',
+        photoUrl:
+            'https://www.leparisien.fr/resizer/s2oI075W3qw7Lw-bFJbX52YVS8s=/622x389/cloudfront-eu-central-1.images.arcpublishing.com/leparisien/F2ZK7FTFPRDBDCCXXZVKWMX4LE.jpg',
+        description:
+            'Gymnase municipal proposant plusieurs activités sportives, notamment le basketball et le volleyball.',
         openingHours: 'Lun-Ven: 9h-22h, Sam: 9h-19h, Dim: 9h-17h',
         priceRange: 'Gratuit-10€',
         website: 'https://www.paris.fr/equipements/gymnase-cevennes-8044',
@@ -425,3 +434,4 @@ class FacilityRepository {
       return null;
     }
   }
+}

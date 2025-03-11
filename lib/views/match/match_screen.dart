@@ -9,6 +9,7 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/sport_repository.dart';
 import '../../repositories/match_repository.dart';
+import '../../utils/test_data_initializer.dart';
 import '../chat/conversation_screen.dart';
 import '../discover/profile_card.dart';
 
@@ -85,6 +86,21 @@ class _MatchScreenState extends State<MatchScreen>
           _loadAcceptedMatches(),
         ]);
 
+        // If there are no users in the system, initialize test data
+        if (_usersMap.isEmpty) {
+          debugPrint("Aucun utilisateur trouvé, initialisation des données de test...");
+          
+          // Try to initialize test data
+          await TestDataInitializer.initializeAllTestData();
+          
+          // Reload data after initialization
+          await Future.wait([
+            _loadPotentialMatches(),
+            _loadPendingRequests(),
+            _loadAcceptedMatches(),
+          ]);
+        }
+
         // Load user sport info for each potential match
         await _loadUserSportInfo();
       } else {
@@ -98,6 +114,7 @@ class _MatchScreenState extends State<MatchScreen>
         _errorMessage =
             'Erreur lors du chargement des données: ${e.toString()}';
       });
+      debugPrint("ERREUR MATCH SCREEN: $e");
     } finally {
       if (mounted) {
         setState(() {
@@ -160,6 +177,8 @@ class _MatchScreenState extends State<MatchScreen>
 
   // Fonction pour générer des utilisateurs factices pour la démo
   void _generateDemoUsers(int sportId) {
+    debugPrint("Génération d'utilisateurs factices pour la démo");
+    
     final demoUsers = [
       UserModel(
         id: 'demo1',
@@ -217,6 +236,8 @@ class _MatchScreenState extends State<MatchScreen>
         lookingForPartners: true,
       );
     }
+    
+    debugPrint("${demoUsers.length} utilisateurs factices générés");
   }
 
   Future<void> _loadPendingRequests() async {
@@ -235,6 +256,8 @@ class _MatchScreenState extends State<MatchScreen>
           }
         }
       }
+      
+      debugPrint("Nombre de demandes en attente: ${_pendingRequests.length}");
     } catch (e) {
       debugPrint('Error loading pending requests: $e');
     }
@@ -260,6 +283,8 @@ class _MatchScreenState extends State<MatchScreen>
           }
         }
       }
+      
+      debugPrint("Nombre de matches acceptés: ${_acceptedMatches.length}");
     } catch (e) {
       debugPrint('Error loading accepted matches: $e');
     }
@@ -1022,4 +1047,3 @@ class _MatchScreenState extends State<MatchScreen>
       },
     );
   }
-}
