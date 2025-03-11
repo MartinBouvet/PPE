@@ -16,14 +16,7 @@ class SportRepository {
           .toList();
     } catch (e) {
       debugPrint('Erreur lors de la récupération des sports: $e');
-
-      // Si erreur avec Supabase, retourner des données factices
-      if (e.toString().contains('does not exist')) {
-        return _generateMockSports();
-      }
-
-      // Retourner une liste vide en cas d'erreur plutôt que de planter
-      return [];
+      throw Exception('Échec de la récupération des sports: $e');
     }
   }
 

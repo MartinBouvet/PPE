@@ -14,7 +14,7 @@ class AuthRepository {
       }
 
       final userData = await _supabase
-          .from('app_user')
+          .from('app_user') // Vérifiez que c'est bien 'app_user' et pas 'user'
           .select()
           .eq('id', authUser.id)
           .maybeSingle();

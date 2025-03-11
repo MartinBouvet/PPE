@@ -10,8 +10,11 @@ class UserRepository {
 
   Future<UserModel?> getUserProfile(String userId) async {
     try {
-      final userData =
-          await _supabase.from('app_user').select().eq('id', userId).single();
+      final userData = await _supabase
+          .from('app_user') // Vérifiez que c'est 'app_user'
+          .select()
+          .eq('id', userId)
+          .single();
 
       return UserModel.fromJson(userData);
     } catch (e) {
@@ -28,9 +31,7 @@ class UserRepository {
   }
 
   Future<void> updateUserProfile(
-    String userId,
-    Map<String, dynamic> data,
-  ) async {
+      String userId, Map<String, dynamic> data) async {
     try {
       await _supabase.from('app_user').update(data).eq('id', userId);
     } catch (e) {

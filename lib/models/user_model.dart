@@ -25,16 +25,14 @@ class UserModel {
       id: json['id'],
       firstName: json['first_name'],
       pseudo: json['pseudo'],
-      birthDate:
-          json['birth_date'] != null
-              ? DateTime.parse(json['birth_date'])
-              : null,
+      birthDate: json['birth_date'] != null
+          ? DateTime.parse(json['birth_date'])
+          : null,
       gender: json['gender'],
       photo: json['photo'],
-      inscriptionDate:
-          json['inscription_date'] != null
-              ? DateTime.parse(json['inscription_date'])
-              : null,
+      inscriptionDate: json['inscription_date'] != null
+          ? DateTime.parse(json['inscription_date'])
+          : null,
       description: json['description'],
     );
   }

@@ -105,11 +105,10 @@ class ChatRepository {
   }
 
   Future<List<MessageModel>> getConversationMessages(
-    String conversationId,
-  ) async {
+      String conversationId) async {
     try {
       final messages = await _supabase
-          .from('message')
+          .from('message') // Vérifiez que c'est 'message' et non 'messages'
           .select()
           .eq('id_conversation', conversationId)
           .order('sent_at', ascending: false);
@@ -124,10 +123,7 @@ class ChatRepository {
   }
 
   Future<bool> sendMessage(
-    String conversationId,
-    String senderId,
-    String content,
-  ) async {
+      String conversationId, String senderId, String content) async {
     if (content.trim().isEmpty) {
       return false;
     }

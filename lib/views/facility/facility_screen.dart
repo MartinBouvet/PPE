@@ -78,9 +78,13 @@ class _FacilityScreenState extends State<FacilityScreen> {
       // Charger les sports d'abord
       _sports = await _sportRepository.getAllSports();
 
+      // Force l'initialisation des données de test avant de charger les installations
+      await _facilityRepository.initializeFacilitiesData();
+
       // Ensuite charger les installations
       _facilities = await _facilityRepository.getAllFacilities();
 
+      debugPrint('Nombre d\'installations chargées: ${_facilities.length}');
       // Si aucune installation n'est disponible, initialiser les données de test
       if (_facilities.isEmpty || _facilities.length <= 1) {
         debugPrint("Initialisation des données de test en cours...");

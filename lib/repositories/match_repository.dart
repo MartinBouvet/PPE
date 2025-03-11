@@ -38,63 +38,6 @@ class MatchRepository {
     }
   }
 
-  Future<bool> createMatchRequest(
-    String requesterId,
-    String likedUserId,
-  ) async {
-    try {
-      // Vérifier si une demande existe déjà
-      final existingRequest = await _supabase
-          .from('match_user')
-          .select()
-          .eq('id_user_requester', requesterId)
-          .eq('id_user_liked', likedUserId)
-          .maybeSingle();
-
-      if (existingRequest != null) {
-        // La demande existe déjà, mettre à jour si elle a été rejetée
-        if (existingRequest['request_status'] == 'rejected') {
-          await _supabase
-              .from('match_user')
-              .update({
-                'request_status': 'pending',
-                'request_date': DateTime.now().toIso8601String(),
-                'response_date': null,
-              })
-              .eq('id_user_requester', requesterId)
-              .eq('id_user_liked', likedUserId);
-        }
-      } else {
-        // Créer une nouvelle demande
-        await _supabase.from('match_user').insert({
-          'id_user_requester': requesterId,
-          'id_user_liked': likedUserId,
-          'request_status': 'pending',
-          'request_date': DateTime.now().toIso8601String(),
-        });
-      }
-
-      // Vérifier si l'autre utilisateur a déjà fait une demande (match mutuel)
-      final reverseRequest = await _supabase
-          .from('match_user')
-          .select()
-          .eq('id_user_requester', likedUserId)
-          .eq('id_user_liked', requesterId)
-          .eq('request_status', 'pending')
-          .maybeSingle();
-
-      // Si match mutuel, accepter automatiquement les deux demandes et créer une conversation
-      if (reverseRequest != null) {
-        await respondToMatchRequest(likedUserId, requesterId, true);
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Erreur lors de la création de la demande de match: $e');
-      return false;
-    }
-  }
-
   Future<bool> respondToMatchRequest(
     String requesterId,
     String likedUserId,
@@ -179,7 +122,8 @@ class MatchRepository {
   Future<List<MatchModel>> getPendingMatchRequests(String userId) async {
     try {
       final requests = await _supabase
-          .from('match_user')
+          .from(
+              'match_user') // Vérifiez que c'est 'match_user' et pas juste 'match'
           .select()
           .eq('id_user_liked', userId)
           .eq('request_status', 'pending');
@@ -190,6 +134,47 @@ class MatchRepository {
     } catch (e) {
       debugPrint('Erreur lors de la récupération des demandes de match: $e');
       return [];
+    }
+  }
+
+  Future<bool> createMatchRequest(
+      String requesterId, String likedUserId) async {
+    try {
+      // Vérifier si une demande existe déjà
+      final existingRequest = await _supabase
+          .from('match_user')
+          .select()
+          .eq('id_user_requester', requesterId)
+          .eq('id_user_liked', likedUserId)
+          .maybeSingle();
+
+      if (existingRequest != null) {
+        // La demande existe déjà, mettre à jour si elle a été rejetée
+        if (existingRequest['request_status'] == 'rejected') {
+          await _supabase
+              .from('match_user')
+              .update({
+                'request_status': 'pending',
+                'request_date': DateTime.now().toIso8601String(),
+                'response_date': null,
+              })
+              .eq('id_user_requester', requesterId)
+              .eq('id_user_liked', likedUserId);
+        }
+      } else {
+        // Créer une nouvelle demande
+        await _supabase.from('match_user').insert({
+          'id_user_requester': requesterId,
+          'id_user_liked': likedUserId,
+          'request_status': 'pending',
+          'request_date': DateTime.now().toIso8601String(),
+        });
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Erreur lors de la création de la demande de match: $e');
+      return false;
     }
   }
 

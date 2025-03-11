@@ -63,7 +63,7 @@ class FacilityRepository {
           'latitude': 48.8567,
           'longitude': 2.2897,
           'photo_url':
-              'https://www.paris.fr/media/emile-anthoine-sdpe_34617/cover-r4x3w1000-579609ab1be56-emile-anthoine-sdpe.jpg',
+              'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/3.png',
           'description':
               'Centre sportif proposant plusieurs équipements dont un gymnase, un terrain de football et des espaces de fitness.',
           'opening_hours': 'Lun-Ven: 8h-22h, Sam-Dim: 9h-20h',
@@ -71,12 +71,7 @@ class FacilityRepository {
           'website':
               'https://www.paris.fr/equipements/centre-sportif-emile-anthoine-2329',
           'phone': '01 45 75 54 90',
-          'sports': [
-            1,
-            3,
-            6,
-            9
-          ] // IDs des sports: Basketball, Football, Fitness, Course à pied
+          'sports': [1, 3, 6, 9]
         },
         {
           'name': 'Piscine Armand Massard',

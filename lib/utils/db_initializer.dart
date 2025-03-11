@@ -11,10 +11,10 @@ class DbInitializer {
     try {
       // Liste des tables requises
       const requiredTables = [
-        'app_user',
+        'app_user', // Vérifiez que c'est 'app_user' et pas 'user'
         'sport',
         'sport_user',
-        'match_user',
+        'match_user', // Vérifiez que c'est 'match_user' et pas juste 'match'
         'conversation',
         'conversation_participant',
         'message',

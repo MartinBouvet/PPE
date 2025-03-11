@@ -22,9 +22,8 @@ class MessageModel {
       senderId: json['id_user_sender'],
       content: json['content'],
       sentAt: DateTime.parse(json['sent_at']),
-      isRead:
-          json['edited'] ??
-          false, // Nous utilisons le champ 'edited' comme indicateur de lecture
+      isRead: json['edited'] ??
+          false, // Vous utilisez 'edited' comme indicateur de lecture
     );
   }
 }
