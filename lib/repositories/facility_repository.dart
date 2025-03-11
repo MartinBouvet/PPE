@@ -296,6 +296,22 @@ class FacilityRepository {
           'website': 'https://www.paris.fr/equipements/parc-andre-citroen-1791',
           'phone': '01 53 98 98 98',
           'sports': [9, 10] // IDs des sports: Course à pied, Yoga en plein air
+        },
+        {
+          'name': 'Complexe Sportif Jean Bouin',
+          'address': '20-40 Avenue du Général Sarrail, 75016 Paris',
+          'arrondissement': '16ème',
+          'latitude': 48.8434,
+          'longitude': 2.2519,
+          'photo_url':
+              'https://www.paris.fr/media/jean-bouin_34570/cover-r4x3w1000-579609de68a66-jean-bouin.jpg',
+          'description':
+              'Grand complexe sportif offrant des terrains de rugby, football, hockey et des pistes d\'athlétisme. Le stade Jean Bouin est également connu pour accueillir des événements sportifs majeurs.',
+          'opening_hours': 'Lun-Dim: 8h-22h (selon activités)',
+          'price_range': '5€-25€ selon activités',
+          'website': 'https://www.paris.fr/equipements/stade-jean-bouin-9234',
+          'phone': '01 40 71 33 64',
+          'sports': [3, 9, 1] // Football, Course à pied, Basketball
         }
       ];
 
