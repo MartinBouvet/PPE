@@ -78,36 +78,26 @@ class _FacilityScreenState extends State<FacilityScreen> {
       // Charger les sports d'abord
       _sports = await _sportRepository.getAllSports();
 
-      // Force l'initialisation des données de test avant de charger les installations
-      await _facilityRepository.initializeFacilitiesData();
+      // Essayer de charger les installations depuis la base de données
+      try {
+        // Force l'initialisation des données de test avant de charger les installations
+        await _facilityRepository.initializeFacilitiesData();
 
-      // Ensuite charger les installations
-      _facilities = await _facilityRepository.getAllFacilities();
-
-      debugPrint('Nombre d\'installations chargées: ${_facilities.length}');
-      // Si aucune installation n'est disponible, initialiser les données de test
-      if (_facilities.isEmpty || _facilities.length <= 1) {
-        debugPrint("Initialisation des données de test en cours...");
-
-        // D'abord, initialiser les sports
-        await _sportRepository.getAllSports();
-
-        // Initialiser les installations sportives
-        bool facilitiesInitialized =
-            await _facilityRepository.initializeFacilitiesData();
-        debugPrint(
-            "Installations sportives initialisées: $facilitiesInitialized");
-
-        // Initialiser toutes les données de test (utilisateurs, matchs, etc.)
-        await TestDataInitializer.initializeAllTestData();
-
-        // Recharger les installations
+        // Ensuite charger les installations
         _facilities = await _facilityRepository.getAllFacilities();
+        debugPrint('Nombre d\'installations chargées: ${_facilities.length}');
+      } catch (facilityError) {
         debugPrint(
-            "Nombre d'installations après initialisation: ${_facilities.length}");
+            'Erreur lors du chargement des installations: $facilityError');
+        // Utiliser des installations factices en cas d'erreur
+        _facilities = _generateMockFacilities();
+      }
 
-        // Recharger les sports au cas où
-        _sports = await _sportRepository.getAllSports();
+      // Si aucune installation n'est disponible ou moins de 2, utiliser les données factices
+      if (_facilities.isEmpty || _facilities.length < 2) {
+        debugPrint(
+            "Utilisation des installations factices (moins de 2 trouvées)");
+        _facilities = _generateMockFacilities();
       }
     } catch (e) {
       setState(() {
@@ -115,6 +105,9 @@ class _FacilityScreenState extends State<FacilityScreen> {
             'Erreur lors du chargement des données: ${e.toString()}';
       });
       debugPrint("ERREUR: $e");
+
+      // En cas d'erreur générale, utiliser quand même les installations factices
+      _facilities = _generateMockFacilities();
     } finally {
       if (mounted) {
         setState(() {
@@ -123,12 +116,14 @@ class _FacilityScreenState extends State<FacilityScreen> {
       }
     }
   }
-
   // Reste du code inchangé
 
   List<SportFacilityModel> _getFilteredFacilities() {
-    // Si aucune installation n'est disponible, utiliser les installations factices
-    if (_facilities.isEmpty) {
+    // Si aucune installation n'est disponible ou s'il y en a moins de 2,
+    // utiliser les installations factices générées localement
+    if (_facilities.isEmpty || _facilities.length < 2) {
+      debugPrint(
+          "Utilisation des installations factices car moins de 2 installations trouvées");
       _facilities = _generateMockFacilities();
     }
 
@@ -243,6 +238,41 @@ class _FacilityScreenState extends State<FacilityScreen> {
         phone: '01 58 14 20 00',
         sportIds: [1, 2, 3, 9],
       ),
+      // Ajout de nouvelles installations pour garantir plus d'options
+      SportFacilityModel(
+        id: 6,
+        name: 'Salle de Fitness Parc des Princes',
+        address: '24 Rue du Commandant Guilbaud, 75016 Paris',
+        arrondissement: '16ème',
+        latitude: 48.8414,
+        longitude: 2.2530,
+        photoUrl:
+            'https://media.istockphoto.com/id/1322158059/photo/empty-modern-gym-with-various-equipment.jpg?s=612x612&w=0&k=20&c=39RPTXfv3JTKNBBEiGO7uzGYZoyS6mE8U9q8mNGoh-w=',
+        description:
+            'Salle de fitness moderne avec équipements de musculation et de cardio, ainsi que des cours collectifs.',
+        openingHours: 'Lun-Dim: 6h-23h',
+        priceRange: '15€-30€',
+        website: 'https://example.com/fitness-parc-princes',
+        phone: '01 45 24 67 89',
+        sportIds: [6, 8],
+      ),
+      SportFacilityModel(
+        id: 7,
+        name: 'Centre d\'Escalade Vertical Art',
+        address: '18 Rue du Général Malleterre, 75016 Paris',
+        arrondissement: 'Proche 15ème',
+        latitude: 48.8393,
+        longitude: 2.2624,
+        photoUrl:
+            'https://media.istockphoto.com/id/1366252784/photo/indoor-climbing-gym-with-exercise-equipment.jpg?s=612x612&w=0&k=20&c=B5JqVVpHDFJIc1yxpNwIMyeQxT9hBTkBzZAweCTt-9E=',
+        description:
+            'Centre d\'escalade indoor avec murs de différents niveaux de difficulté et cours pour tous les âges.',
+        openingHours: 'Lun-Ven: 11h-22h, Sam-Dim: 10h-20h',
+        priceRange: '15€-20€',
+        website: 'https://verticalart.fr',
+        phone: '01 46 87 32 89',
+        sportIds: [7],
+      ),
     ];
   }
 
@@ -257,12 +287,12 @@ class _FacilityScreenState extends State<FacilityScreen> {
   String _getDefaultImage(int sportId) {
     final sportImages = {
       1: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/1.jpg', // Basketball
-      2: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/2.jpg', // Tennis
-      3: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/3.jpg', // Football
-      4: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/4.jpg', // Natation
-      5: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/5.jpg', // Randonnée
-      6: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/6.jpg', // Yoga
-      7: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/7.jpg', // Escalade
+      2: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/3.jpg', // Tennis
+      3: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/5.jpg', // Football
+      4: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/2.jpg', // Natation
+      5: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/8.jpg', // Randonnée
+      6: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/4.jpg', // Yoga
+      7: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/6.jpg', // Escalade
       8: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/8.jpg', // Fitness
       9: 'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/8.jpg', // Course à pied
     };
