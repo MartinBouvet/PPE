@@ -7,16 +7,25 @@ import '../models/sport_model.dart';
 class SportRepository {
   final _supabase = SupabaseConfig.client;
 
+  // Liste des niveaux valides (selon la contrainte de la base de données)
+  final List<String> validSkillLevels = [
+    'Débutant',
+    'Intermédiaire',
+    'Avancé',
+    'Expert'
+  ];
+
   Future<List<SportModel>> getAllSports() async {
     try {
       final sports = await _supabase.from('sport').select().order('name');
+      debugPrint('Sports récupérés: ${sports.length}');
 
       return sports
           .map<SportModel>((sport) => SportModel.fromJson(sport))
           .toList();
     } catch (e) {
       debugPrint('Erreur lors de la récupération des sports: $e');
-      throw Exception('Échec de la récupération des sports: $e');
+      return _generateMockSports();
     }
   }
 
@@ -33,13 +42,6 @@ class SportRepository {
           id: 5, name: 'Volleyball', description: 'Sport collectif de ballon'),
       SportModel(id: 6, name: 'Fitness', description: 'Activité de bien-être'),
       SportModel(id: 7, name: 'Escalade', description: 'Sport de grimpe'),
-      SportModel(
-          id: 8, name: 'Danse', description: 'Activité sportive artistique'),
-      SportModel(id: 9, name: 'Course à pied', description: 'Sport de course'),
-      SportModel(
-          id: 10,
-          name: 'Yoga en plein air',
-          description: 'Yoga pratiqué en extérieur'),
     ];
   }
 
@@ -65,32 +67,61 @@ class SportRepository {
     }
   }
 
-  Future<void> addSport(
-      String name, String? description, String? logoUrl) async {
+  // Méthode pour ajouter un sport à un utilisateur
+  Future<bool> addSportToUser(
+    String userId,
+    int sportId, {
+    String? clubName,
+    String? skillLevel,
+    bool lookingForPartners = false,
+  }) async {
     try {
-      await _supabase.from('sport').insert({
-        'name': name,
-        'description': description,
-        'logo': logoUrl,
-      });
-    } catch (e) {
-      debugPrint('Erreur lors de l\'ajout du sport: $e');
-      throw Exception('Échec de l\'ajout du sport: $e');
-    }
-  }
+      // S'assurer que le niveau est valide
+      final validLevel =
+          skillLevel != null && validSkillLevels.contains(skillLevel)
+              ? skillLevel
+              : 'Débutant';
 
-  // Vérifier si un sport existe déjà
-  Future<bool> sportExists(String sportName) async {
-    try {
-      final result = await _supabase
-          .from('sport')
-          .select('id_sport')
-          .ilike('name', sportName)
+      debugPrint(
+          'Ajout du sport $sportId à l\'utilisateur $userId avec niveau: $validLevel');
+
+      // Vérifier si l'utilisateur a déjà ce sport
+      final existingSport = await _supabase
+          .from('sport_user')
+          .select()
+          .eq('id_user', userId)
+          .eq('id_sport', sportId)
           .maybeSingle();
 
-      return result != null;
+      if (existingSport != null) {
+        // Mettre à jour plutôt qu'ajouter
+        await _supabase
+            .from('sport_user')
+            .update({
+              'club_name': clubName,
+              'skill_level': validLevel,
+              'looking_for_partners': lookingForPartners,
+            })
+            .eq('id_user', userId)
+            .eq('id_sport', sportId);
+
+        debugPrint('Sport $sportId mis à jour pour l\'utilisateur $userId');
+      } else {
+        // Ajouter une nouvelle entrée
+        await _supabase.from('sport_user').insert({
+          'id_user': userId,
+          'id_sport': sportId,
+          'club_name': clubName,
+          'skill_level': validLevel,
+          'looking_for_partners': lookingForPartners,
+        });
+
+        debugPrint('Sport $sportId ajouté pour l\'utilisateur $userId');
+      }
+
+      return true;
     } catch (e) {
-      debugPrint('Erreur lors de la vérification de l\'existence du sport: $e');
+      debugPrint('Erreur lors de l\'ajout du sport à l\'utilisateur: $e');
       return false;
     }
   }
@@ -107,73 +138,6 @@ class SportRepository {
     } catch (e) {
       debugPrint('Erreur lors de la suppression du sport: $e');
       return false;
-    }
-  }
-
-  // Méthode pour ajouter un sport à un utilisateur
-  Future<bool> addSportToUser(
-    String userId,
-    int sportId, {
-    String? clubName,
-    String? skillLevel,
-    bool lookingForPartners = false,
-  }) async {
-    try {
-      // Vérifier si l'utilisateur a déjà ce sport
-      final existingSport = await _supabase
-          .from('sport_user')
-          .select()
-          .eq('id_user', userId)
-          .eq('id_sport', sportId)
-          .maybeSingle();
-
-      if (existingSport != null) {
-        // Mettre à jour plutôt qu'ajouter
-        await _supabase
-            .from('sport_user')
-            .update({
-              'club_name': clubName,
-              'skill_level': skillLevel,
-              'looking_for_partners': lookingForPartners,
-            })
-            .eq('id_user', userId)
-            .eq('id_sport', sportId);
-      } else {
-        // Ajouter une nouvelle entrée
-        await _supabase.from('sport_user').insert({
-          'id_user': userId,
-          'id_sport': sportId,
-          'club_name': clubName,
-          'skill_level': skillLevel,
-          'looking_for_partners': lookingForPartners,
-        });
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Erreur lors de l\'ajout du sport à l\'utilisateur: $e');
-      return false;
-    }
-  }
-
-  // Récupérer les sports populaires (les plus ajoutés par les utilisateurs)
-  Future<List<SportModel>> getPopularSports({int limit = 5}) async {
-    try {
-      // Cette requête suppose que vous avez une vue ou une requête qui compte les sports par popularité
-      final result = await _supabase
-          .rpc('get_popular_sports', params: {'limit_count': limit});
-
-      if (result != null) {
-        return (result as List)
-            .map<SportModel>((sport) => SportModel.fromJson(sport))
-            .toList();
-      }
-
-      // Fallback: retourner simplement les premiers sports
-      return await getAllSports().then((sports) => sports.take(limit).toList());
-    } catch (e) {
-      debugPrint('Erreur lors de la récupération des sports populaires: $e');
-      return await getAllSports().then((sports) => sports.take(limit).toList());
     }
   }
 }

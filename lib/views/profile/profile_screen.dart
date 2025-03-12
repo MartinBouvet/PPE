@@ -48,30 +48,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      _user = await _authRepository.getCurrentUser();
+      // Récupérer l'utilisateur courant
+      final user = await _authRepository.getCurrentUser();
 
-      if (_user != null) {
-        // Charger les sports de l'utilisateur
-        _userSports = await _userRepository.getUserSports(_user!.id);
+      if (user != null) {
+        setState(() {
+          _user = user;
+        });
 
-        // Charger les détails des sports
-        for (var sportUser in _userSports) {
-          final sport = await _sportRepository.getSportById(sportUser.sportId);
-          if (sport != null) {
-            setState(() {
-              _sportsMap[sport.id] = sport;
-            });
+        debugPrint(
+            'Utilisateur chargé: ${user.pseudo ?? "null"}, ID: ${user.id}');
+
+        // Récupérer les sports de l'utilisateur
+        final userSports = await _userRepository.getUserSports(user.id);
+        setState(() {
+          _userSports = userSports;
+        });
+
+        debugPrint('Sports chargés: ${userSports.length}');
+
+        // Récupérer les détails de chaque sport
+        for (var sportUser in userSports) {
+          try {
+            final sport =
+                await _sportRepository.getSportById(sportUser.sportId);
+            if (sport != null) {
+              setState(() {
+                _sportsMap[sport.id] = sport;
+              });
+              debugPrint('Sport ${sport.id} chargé: ${sport.name}');
+            }
+          } catch (e) {
+            debugPrint(
+                'Erreur lors du chargement du sport ${sportUser.sportId}: $e');
           }
         }
+      } else {
+        debugPrint('Aucun utilisateur connecté trouvé');
       }
     } catch (e) {
+      debugPrint('Erreur lors du chargement du profil: $e');
       setState(() {
         _errorMessage = 'Erreur lors du chargement du profil: ${e.toString()}';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -111,9 +136,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isUploadingImage = true;
       });
 
+      debugPrint('Image sélectionnée: ${pickedFile.path}');
       final imageFile = File(pickedFile.path);
+
+      // Upload de l'image
       final photoUrl =
           await _imageService.uploadProfileImage(imageFile, _user!.id);
+      debugPrint('URL de la photo téléchargée: $photoUrl');
 
       if (photoUrl != null) {
         // Mettre à jour le profil avec la nouvelle photo
@@ -129,23 +158,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
+      debugPrint('Erreur lors du téléchargement de l\'image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Erreur lors du téléchargement de l\'image: ${e.toString()}')),
+          SnackBar(content: Text('Erreur: ${e.toString()}')),
         );
       }
     } finally {
-      setState(() {
-        _isUploadingImage = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
     }
   }
 
   void _navigateToSportSelection() async {
     if (_user == null) return;
 
+    debugPrint(
+        'Navigation vers la sélection des sports pour l\'utilisateur ${_user!.id}');
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -155,11 +187,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (result == true) {
       // Si des modifications ont été faites, recharger les données
-      _loadUserData();
+      debugPrint('Modifications détectées, rechargement des données');
+      await _loadUserData();
     }
   }
 
-  // Nouvelle méthode pour initialiser les données de test
   Future<void> _initializeTestData() async {
     try {
       // Afficher un indicateur de chargement
@@ -196,6 +228,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: result ? Colors.green : Colors.red,
           ),
         );
+      }
+
+      // Recharger les données
+      if (result) {
+        await _loadUserData();
       }
     } catch (e) {
       // Fermer la boîte de dialogue en cas d'erreur
@@ -626,6 +663,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               subtitle: const Text(
                                   'Crée des utilisateurs et des lieux fictifs'),
                               onTap: _initializeTestData,
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              leading:
+                                  const Icon(Icons.refresh, color: Colors.blue),
+                              title: const Text('Recharger les données'),
+                              onTap: _loadUserData,
                             ),
                           ],
                         ),

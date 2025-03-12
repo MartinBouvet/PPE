@@ -1,20 +1,20 @@
 // lib/models/user_model.dart
 class UserModel {
   final String id;
-  final String? firstName;
-  final String? pseudo;
+  String? firstName;
+  String? pseudo;
   final DateTime? birthDate;
-  final String? gender;
-  final String? photo;
+  String? gender; // Ajout du champ gender
+  String? photo;
   final DateTime? inscriptionDate;
-  final String? description;
+  String? description;
 
   UserModel({
     required this.id,
     this.firstName,
     this.pseudo,
     this.birthDate,
-    this.gender,
+    this.gender, // Ajout du paramètre
     this.photo,
     this.inscriptionDate,
     this.description,

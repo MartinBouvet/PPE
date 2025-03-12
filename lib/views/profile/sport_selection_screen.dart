@@ -4,6 +4,7 @@ import '../../models/sport_model.dart';
 import '../../models/sport_user_model.dart';
 import '../../repositories/sport_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../config/supabase_config.dart'; // Ajout de l'import
 
 class SportSelectionScreen extends StatefulWidget {
   final String userId;
@@ -18,8 +19,7 @@ class SportSelectionScreen extends StatefulWidget {
 class _SportSelectionScreenState extends State<SportSelectionScreen> {
   final _sportRepository = SportRepository();
   final _userRepository = UserRepository();
-
-  List<SportModel> _allSports = [];
+  final _supabase = SupabaseConfig.client;
   List<SportUserModel> _userSports = [];
   List<SportModel> _selectedSports = [];
 
@@ -52,11 +52,14 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
     try {
       // Charger tous les sports disponibles
       _allSports = await _sportRepository.getAllSports();
+      debugPrint('Sports chargés: ${_allSports.length}');
 
       // Charger les sports de l'utilisateur
       _userSports = await _userRepository.getUserSports(widget.userId);
+      debugPrint('Sports de l\'utilisateur chargés: ${_userSports.length}');
 
-      // Marquer les sports déjà sélectionnés
+      // Initialiser les sports déjà sélectionnés
+      final selectedSports = <SportModel>[];
       for (var userSport in _userSports) {
         final sport = _allSports.firstWhere(
           (s) => s.id == userSport.sportId,
@@ -64,11 +67,16 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
               id: userSport.sportId, name: 'Sport #${userSport.sportId}'),
         );
 
-        _selectedSports.add(sport);
+        selectedSports.add(sport);
         _skillLevels[sport.id] = userSport.skillLevel ?? 'Débutant';
         _lookingForPartners[sport.id] = userSport.lookingForPartners;
       }
+
+      setState(() {
+        _selectedSports = selectedSports;
+      });
     } catch (e) {
+      debugPrint('Erreur lors du chargement des données: $e');
       setState(() {
         _errorMessage =
             'Erreur lors du chargement des données: ${e.toString()}';
@@ -80,6 +88,7 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
     }
   }
 
+  // Dans SportSelectionScreen - méthode _saveUserSports
   Future<void> _saveUserSports() async {
     setState(() {
       _isSaving = true;
@@ -87,64 +96,83 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
     });
 
     try {
+      debugPrint('Sauvegarde des sports pour l\'utilisateur ${widget.userId}');
+
       // Liste des sports actuels de l'utilisateur
       final currentSportIds = _userSports.map((s) => s.sportId).toSet();
+
       // Liste des sports sélectionnés
       final selectedSportIds = _selectedSports.map((s) => s.id).toSet();
 
+      debugPrint('Sports actuels: $currentSportIds');
+      debugPrint('Sports sélectionnés: $selectedSportIds');
+
+      bool success = true;
+
       // Sports à ajouter
-      final sportsToAdd = selectedSportIds.difference(currentSportIds);
-      // Sports à supprimer
-      final sportsToRemove = currentSportIds.difference(selectedSportIds);
-      // Sports à mettre à jour (existants et toujours sélectionnés)
-      final sportsToUpdate = selectedSportIds.intersection(currentSportIds);
-
-      // Ajouter les nouveaux sports
-      for (var sportId in sportsToAdd) {
+      for (var sport in _selectedSports) {
+        final sportId = sport.id;
         final skillLevel = _skillLevels[sportId] ?? 'Débutant';
         final lookingForPartners = _lookingForPartners[sportId] ?? false;
 
-        await _sportRepository.addSportToUser(
-          widget.userId,
-          sportId,
-          skillLevel: skillLevel,
-          lookingForPartners: lookingForPartners,
-        );
+        // Utiliser upsert pour ajouter ou mettre à jour
+        try {
+          await _supabase.from('sport_user').upsert({
+            'id_user': widget.userId,
+            'id_sport': sportId,
+            'club_name': '', // Valeur vide par défaut
+            'skill_level': skillLevel,
+            'looking_for_partners': lookingForPartners,
+          }, onConflict: 'id_user,id_sport');
+
+          debugPrint('Sport $sportId ajouté/mis à jour avec succès');
+        } catch (e) {
+          debugPrint(
+              'Erreur lors de l\'ajout/mise à jour du sport $sportId: $e');
+          success = false;
+        }
       }
 
-      // Mettre à jour les sports existants
-      for (var sportId in sportsToUpdate) {
-        final skillLevel = _skillLevels[sportId] ?? 'Débutant';
-        final lookingForPartners = _lookingForPartners[sportId] ?? false;
+      // Sports à supprimer (ceux qui étaient présents mais ne sont plus sélectionnés)
+      for (var sportUser in _userSports) {
+        if (!selectedSportIds.contains(sportUser.sportId)) {
+          try {
+            await _supabase
+                .from('sport_user')
+                .delete()
+                .eq('id_user', widget.userId)
+                .eq('id_sport', sportUser.sportId);
 
-        await _sportRepository.addSportToUser(
-          widget.userId,
-          sportId,
-          skillLevel: skillLevel,
-          lookingForPartners: lookingForPartners,
-        );
-      }
-
-      // Supprimer les sports qui ne sont plus sélectionnés
-      for (var sportId in sportsToRemove) {
-        await _removeSportFromUser(sportId);
+            debugPrint('Sport ${sportUser.sportId} supprimé avec succès');
+          } catch (e) {
+            debugPrint(
+                'Erreur lors de la suppression du sport ${sportUser.sportId}: $e');
+            success = false;
+          }
+        }
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sports enregistrés avec succès')),
+          SnackBar(
+              content: Text(success
+                  ? 'Sports enregistrés avec succès'
+                  : 'Certaines opérations ont échoué')),
         );
         Navigator.pop(
             context, true); // Retourner true pour indiquer des changements
       }
     } catch (e) {
+      debugPrint('Erreur lors de l\'enregistrement: $e');
       setState(() {
         _errorMessage = 'Erreur lors de l\'enregistrement: ${e.toString()}';
       });
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 

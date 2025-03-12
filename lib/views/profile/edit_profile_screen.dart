@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/user_model.dart';
 import '../../repositories/user_repository.dart';
 import '../../services/image_service.dart';
+import '../../config/supabase_config.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -20,7 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userRepository = UserRepository();
   final _imageService = ImageService();
-
+  final _supabase = SupabaseConfig.client;
   late TextEditingController _pseudoController;
   late TextEditingController _firstNameController;
   late TextEditingController _descriptionController;
@@ -29,6 +30,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isUploadingImage = false;
   File? _selectedImage;
   String? _currentPhotoUrl;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -38,6 +40,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _descriptionController =
         TextEditingController(text: widget.user.description);
     _currentPhotoUrl = widget.user.photo;
+
+    debugPrint(
+        'Initialisation de l\'écran d\'édition pour : ${widget.user.pseudo}, ID: ${widget.user.id}');
   }
 
   @override
@@ -63,33 +68,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() {
         _selectedImage = File(pickedFile.path);
       });
+
+      debugPrint('Image sélectionnée: ${pickedFile.path}');
     } catch (e) {
-      _showErrorSnackBar(
-          'Erreur lors de la sélection de l\'image: ${e.toString()}');
+      setState(() {
+        _errorMessage =
+            'Erreur lors de la sélection de l\'image: ${e.toString()}';
+      });
+      _showErrorSnackBar(_errorMessage!);
     }
   }
 
+  // Dans EditProfileScreen - méthode _saveProfile
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
+      // Préparer les données à mettre à jour
+      final updatedData = {
+        'pseudo': _pseudoController.text.trim(),
+        'first_name': _firstNameController.text.trim(),
+        'description': _descriptionController.text.trim(),
+      };
+
+      debugPrint('Données à mettre à jour: $updatedData');
+
       // Télécharger la nouvelle image si sélectionnée
-      String? photoUrl = _currentPhotoUrl;
       if (_selectedImage != null) {
         setState(() {
           _isUploadingImage = true;
         });
 
-        photoUrl = await _imageService.uploadProfileImage(
+        // Utiliser le service d'image pour l'upload
+        final photoUrl = await _imageService.uploadProfileImage(
             _selectedImage!, widget.user.id);
 
-        // Si une ancienne image existe et qu'une nouvelle a été téléchargée, supprimer l'ancienne
-        if (photoUrl != null && _currentPhotoUrl != null) {
-          await _imageService.deleteProfileImage(_currentPhotoUrl!);
+        if (photoUrl != null) {
+          updatedData['photo'] = photoUrl;
+          debugPrint('Photo mise à jour: $photoUrl');
         }
 
         setState(() {
@@ -98,23 +119,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       // Mettre à jour le profil
-      await _userRepository.updateUserProfile(widget.user.id, {
-        'pseudo': _pseudoController.text.trim(),
-        'first_name': _firstNameController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        if (photoUrl != null) 'photo': photoUrl,
-      });
+      await _userRepository.updateUserProfile(widget.user.id, updatedData);
+
+      debugPrint('Profil mis à jour avec succès');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profil mis à jour avec succès')),
         );
-        Navigator.pop(context,
-            true); // Retourner true pour indiquer que des changements ont été effectués
+        Navigator.pop(context, true);
       }
     } catch (e) {
+      debugPrint('Erreur lors de la mise à jour: $e');
+      setState(() {
+        _errorMessage = 'Erreur: ${e.toString()}';
+      });
+
       if (mounted) {
-        _showErrorSnackBar('Erreur: ${e.toString()}');
+        _showErrorSnackBar(_errorMessage!);
       }
     } finally {
       if (mounted) {
@@ -165,6 +187,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Message d'erreur
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Photo de profil
               Center(
                 child: Stack(
