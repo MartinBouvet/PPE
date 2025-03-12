@@ -22,7 +22,7 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
   final _supabase = SupabaseConfig.client;
   List<SportUserModel> _userSports = [];
   List<SportModel> _selectedSports = [];
-
+  List<SportModel> _allSports = []; // Ajoutez cette ligne
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
