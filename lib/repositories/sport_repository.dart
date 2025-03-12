@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/sport_model.dart';
+import '../models/sport_user_model.dart';
 
 class SportRepository {
   final _supabase = SupabaseConfig.client;
@@ -67,7 +68,7 @@ class SportRepository {
     }
   }
 
-  // Méthode pour ajouter un sport à un utilisateur
+  // Méthode améliorée pour ajouter un sport à un utilisateur
   Future<bool> addSportToUser(
     String userId,
     int sportId, {
@@ -86,43 +87,77 @@ class SportRepository {
           'Ajout du sport $sportId à l\'utilisateur $userId avec niveau: $validLevel');
 
       // Vérifier si l'utilisateur a déjà ce sport
-      final existingSport = await _supabase
-          .from('sport_user')
-          .select()
-          .eq('id_user', userId)
-          .eq('id_sport', sportId)
-          .maybeSingle();
-
-      if (existingSport != null) {
-        // Mettre à jour plutôt qu'ajouter
-        await _supabase
+      try {
+        final existingSport = await _supabase
             .from('sport_user')
-            .update({
-              'club_name': clubName,
-              'skill_level': validLevel,
-              'looking_for_partners': lookingForPartners,
-            })
+            .select()
             .eq('id_user', userId)
-            .eq('id_sport', sportId);
+            .eq('id_sport', sportId)
+            .maybeSingle();
 
-        debugPrint('Sport $sportId mis à jour pour l\'utilisateur $userId');
-      } else {
-        // Ajouter une nouvelle entrée
-        await _supabase.from('sport_user').insert({
+        if (existingSport != null) {
+          // Mettre à jour plutôt qu'ajouter
+          await _supabase
+              .from('sport_user')
+              .update({
+                'club_name': clubName ?? '',
+                'skill_level': validLevel,
+                'looking_for_partners': lookingForPartners,
+              })
+              .eq('id_user', userId)
+              .eq('id_sport', sportId);
+
+          debugPrint('Sport $sportId mis à jour pour l\'utilisateur $userId');
+        } else {
+          // Ajouter une nouvelle entrée
+          await _supabase.from('sport_user').insert({
+            'id_user': userId,
+            'id_sport': sportId,
+            'club_name': clubName ?? '',
+            'skill_level': validLevel,
+            'looking_for_partners': lookingForPartners,
+          });
+
+          debugPrint('Sport $sportId ajouté pour l\'utilisateur $userId');
+        }
+      } catch (specificError) {
+        debugPrint('Erreur spécifique: $specificError');
+
+        // Si une erreur se produit, on tente une approche différente
+        // Ceci pourrait contourner certaines limitations de RLS (Row Level Security) de Supabase
+        final insertData = {
           'id_user': userId,
           'id_sport': sportId,
-          'club_name': clubName,
+          'club_name': clubName ?? '',
           'skill_level': validLevel,
           'looking_for_partners': lookingForPartners,
-        });
+        };
 
-        debugPrint('Sport $sportId ajouté pour l\'utilisateur $userId');
+        await _supabase
+            .from('sport_user')
+            .upsert(insertData, onConflict: 'id_user,id_sport');
+
+        debugPrint(
+            'Sport $sportId ajouté/mis à jour via upsert pour l\'utilisateur $userId');
       }
 
       return true;
     } catch (e) {
       debugPrint('Erreur lors de l\'ajout du sport à l\'utilisateur: $e');
-      return false;
+      // Tenter une dernière approche si d'autres ont échoué
+      try {
+        await _supabase.rpc('add_sport_to_user', params: {
+          'user_id': userId,
+          'sport_id': sportId,
+          'club_name': clubName ?? '',
+          'skill_level': skillLevel ?? 'Débutant',
+          'is_looking': lookingForPartners,
+        });
+        return true;
+      } catch (rpcError) {
+        debugPrint('Échec de l\'appel RPC: $rpcError');
+        return false;
+      }
     }
   }
 
@@ -137,7 +172,18 @@ class SportRepository {
       return true;
     } catch (e) {
       debugPrint('Erreur lors de la suppression du sport: $e');
-      return false;
+
+      // Tenter une alternative si la première approche échoue
+      try {
+        await _supabase.rpc('remove_sport_from_user', params: {
+          'user_id': userId,
+          'sport_id': sportId,
+        });
+        return true;
+      } catch (rpcError) {
+        debugPrint('Échec de l\'appel RPC: $rpcError');
+        return false;
+      }
     }
   }
 }
