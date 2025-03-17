@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Service de gestion des erreurs pour l'application.
@@ -52,7 +53,7 @@ class ErrorService {
 
     // Si aucune correspondance spécifique, retourner un message générique
     // En mode debug, on inclut l'erreur originale pour faciliter le débogage
-    return kDebugMod
+    return kDebugMode
         ? 'Une erreur est survenue: $errorStr'
         : 'Une erreur est survenue. Veuillez réessayer.';
   }
