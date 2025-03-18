@@ -49,11 +49,12 @@ class WelcomeScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.blue.withOpacity(0.1),
                           shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.sports,
-                          size: 100,
-                          color: Color(0xFF3B82F6),
+                          image: DecorationImage(
+                            image: NetworkImage(
+                              'https://aaygogjvrgskhmlgymik.supabase.co/storage/v1/object/public/bucket_image/images/logo.png',
+                            ),
+                            fit: BoxFit.contain, // Ajustez selon vos besoins
+                          ),
                         ),
                       ),
                     ],
@@ -91,7 +92,7 @@ class WelcomeScreen extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3B82F6),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24), // Increased padding
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
@@ -108,7 +109,7 @@ class WelcomeScreen extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF3B82F6),
                           side: const BorderSide(color: Color(0xFF3B82F6)),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24), // Increased padding
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
