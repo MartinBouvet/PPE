@@ -1,6 +1,7 @@
 // lib/views/auth/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../repositories/auth_repository.dart';
 
@@ -18,18 +19,43 @@ class _SignupScreenState extends State<SignupScreen> {
   final _firstNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _birthDateController = TextEditingController();
   final _authRepository = AuthRepository();
 
   DateTime _selectedDate = DateTime(2000, 1, 1); // Date par défaut
-  String _selectedGender = 'Male'; // Genre par défaut
-
-  // Liste des options de genre
-  final List<String> _genderOptions = ['Male', 'Female', 'Other'];
-
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
+  String? _selectedGender; // Initialisez à null au lieu d'une valeur par défaut
+  String? _genderError; // Pour stocker le message d'erreur
+  final List<String> _genderOptions = ['Homme', 'Femme', 'Autre'];
+
+  @override
+  void initState() {
+    super.initState();
+    _birthDateController.text = _formatDate(_selectedDate);
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      locale: const Locale('fr', 'FR'), // Pour avoir le calendrier en français
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _birthDateController.text = _formatDate(_selectedDate);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -38,35 +64,20 @@ class _SignupScreenState extends State<SignupScreen> {
     _firstNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(1920),
-      lastDate: DateTime.now().subtract(const Duration(days: 365 * 16)), // Minimum 16 ans
-      helpText: 'Sélectionnez votre date de naissance',
-      cancelText: 'Annuler',
-      confirmText: 'Confirmer',
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).primaryColor,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+  String _convertGenderToStandardFormat(String? gender) {
+    switch (gender) {
+      case 'Homme':
+        return 'Male';
+      case 'Femme':
+        return 'Female';
+      case 'Autre':
+        return 'Other';
+      default:
+        return 'No Answer';
     }
   }
 
@@ -74,7 +85,17 @@ class _SignupScreenState extends State<SignupScreen> {
     // Masquer le clavier
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate()) return;
+    // Vérifier si un genre est sélectionné
+    setState(() {
+      if (_selectedGender == null) {
+        _genderError = 'Veuillez sélectionner votre genre';
+      } else {
+        _genderError = null;
+      }
+    });
+
+    // Vérifier si le formulaire est valide ET si un genre est sélectionné
+    if (!_formKey.currentState!.validate() || _genderError != null) return;
 
     setState(() {
       _isLoading = true;
@@ -83,13 +104,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       final user = await _authRepository.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        pseudo: _pseudoController.text.trim(),
-        firstName: _firstNameController.text.trim(),
-        birthDate: _selectedDate,
-        gender: _selectedGender,
-      );
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      pseudo: _pseudoController.text.trim(),
+      firstName: _firstNameController.text.trim(),
+      birthDate: _selectedDate,
+      gender: _convertGenderToStandardFormat(_selectedGender), // Conversion ici
+    );
 
       if (user != null && mounted) {
         context.go('/');
@@ -100,9 +121,11 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       setState(() {
-        if (e.toString().contains('auth/email-already-in-use')) {
-          _errorMessage = 'Cet email est déjà utilisé';
-        } else if (e.toString().contains('auth/weak-password')) {
+        final errorString = e.toString().toLowerCase();
+        if (errorString.contains('email already in use') || 
+            errorString.contains('unique constraint')) {
+          _errorMessage = 'Cet email ou ce pseudo est déjà utilisé';
+        } else if (errorString.contains('weak password')) {
           _errorMessage = 'Le mot de passe est trop faible';
         } else {
           _errorMessage = 'Erreur d\'inscription: ${e.toString()}';
@@ -247,7 +270,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Sélecteur de date de naissance
+                // Champ date de naissance
                 InkWell(
                   onTap: () => _selectDate(context),
                   child: InputDecorator(
@@ -274,37 +297,95 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Sélecteur de genre
-                DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Genre',
-                    prefixIcon: const Icon(Icons.people),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                // Champs genre
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
+                      child: Text(
+                        'Genre',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                  ),
-                  value: _selectedGender,
-                  items: _genderOptions.map((String gender) {
-                    return DropdownMenuItem<String>(
-                      value: gender,
-                      child: Text(gender),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _selectedGender = newValue;
-                      });
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez sélectionner votre genre';
-                    }
-                    return null;
-                  },
+                    Row(
+                      children: [
+                        const SizedBox(width: 10), // Espace à gauche
+                        ...List.generate(_genderOptions.length, (index) {
+                          final gender = _genderOptions[index];
+                          return Expanded(
+                            child: Padding(
+                              // Ajouter un padding horizontal pour rapprocher les rectangles
+                              padding: EdgeInsets.symmetric(
+                                horizontal: index == 3 ? 0 : 5, // Pas de padding à gauche pour le premier
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedGender = gender;
+                                    _genderError = null;
+                                  });
+                                  debugPrint('Genre sélectionné: $_selectedGender');
+                                },
+                                child: Container(
+                                  // Augmenter le padding pour agrandir les rectangles
+                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: _selectedGender == gender 
+                                        ? Theme.of(context).primaryColor.withOpacity(0.1)
+                                        : const Color.fromARGB(0, 197, 142, 142),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedGender == gender 
+                                          ? Theme.of(context).primaryColor
+                                          : _genderError != null 
+                                              ? Color.fromARGB(255, 180, 41, 32)
+                                              : Colors.black,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _selectedGender == gender
+                                          ? Icon(Icons.check_circle, 
+                                              color: Theme.of(context).primaryColor, 
+                                              size: 18)
+                                          : Icon(Icons.circle_outlined, 
+                                              color: _genderError != null ? Color.fromARGB(255, 180, 41, 32) : const Color.fromARGB(255, 0, 0, 0), 
+                                              size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        gender,
+                                        style: TextStyle(
+                                          fontSize: 16, // Changer la taille du texte ici
+                                          color: _selectedGender == gender 
+                                              ? Colors.grey.shade700  // Couleur du texte si sélection
+                                              : _genderError != null ? Color.fromARGB(255, 180, 41, 32) : Colors.black,
+                                          fontWeight: _selectedGender == gender 
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(width: 10), // Espace à droite
+                      ],
+                    ),
+                    // Afficher le message d'erreur si nécessaire
+                    if (_genderError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                        child: Text(
+                          _genderError!,
+                          style: TextStyle(color: Color.fromARGB(255, 180, 41, 32), fontSize: 12),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 
@@ -446,3 +527,4 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
+

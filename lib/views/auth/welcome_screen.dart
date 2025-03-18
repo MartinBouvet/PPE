@@ -31,7 +31,7 @@ class WelcomeScreen extends StatelessWidget {
                           fontSize: 40,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.5,
-                          color: Color(0xFF3B82F6),
+                          color: Color.fromARGB(255, 78, 122, 170),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -47,7 +47,7 @@ class WelcomeScreen extends StatelessWidget {
                         width: 200,
                         height: 200,
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Color.fromARGB(255, 78, 122, 170).withOpacity(0.1),
                           shape: BoxShape.circle,
                           image: DecorationImage(
                             image: NetworkImage(
@@ -90,7 +90,7 @@ class WelcomeScreen extends StatelessWidget {
                       ElevatedButton(
                         onPressed: () => context.go('/login'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3B82F6),
+                          backgroundColor: const Color.fromARGB(255, 78, 122, 170),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24), // Increased padding
                           shape: RoundedRectangleBorder(
@@ -107,8 +107,8 @@ class WelcomeScreen extends StatelessWidget {
                       OutlinedButton(
                         onPressed: () => context.go('/signup'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF3B82F6),
-                          side: const BorderSide(color: Color(0xFF3B82F6)),
+                          foregroundColor: const Color.fromARGB(255, 78, 122, 170),
+                          side: const BorderSide(color: Color.fromARGB(255, 78, 122, 170)),
                           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24), // Increased padding
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
@@ -137,12 +137,12 @@ class WelcomeScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF3B82F6).withOpacity(0.1),
+            color: const Color.fromARGB(255, 78, 122, 170).withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icon,
-            color: const Color(0xFF3B82F6),
+            color: const Color.fromARGB(255, 78, 122, 170),
             size: 24,
           ),
         ),

@@ -56,106 +56,109 @@ class AuthRepository {
     }
   }
 
-  Future<UserModel?> signUp({
-  required String email,
-  required String password,
-  required String pseudo,
-  String? firstName,
-  DateTime? birthDate,
-  required String gender,
-}) async {
-  try {
-    // 1. Créer le compte d'authentification
-    final response = await _supabase.auth.signUp(
-      email: email,
-      password: password,
-    );
-
-    if (response.user == null) {
-      throw Exception('Échec de création du compte');
-    }
-
-    final userId = response.user!.id;
-    debugPrint('Utilisateur créé avec ID: $userId');
-
-    // Vérifier que le genre est valide
-    if (!['Male', 'Female', 'Other', 'No Answer'].contains(gender)) {
-      gender = 'No Answer';
-    }
-
-    // Formater la date de naissance
-    final userBirthDate = birthDate ?? DateTime(2000, 1, 1);
-    final formattedBirthDate = "${userBirthDate.year.toString().padLeft(4, '0')}-${userBirthDate.month.toString().padLeft(2, '0')}-${userBirthDate.day.toString().padLeft(2, '0')}";
-
-    // IMPORTANT: Attendre que la session soit établie
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Vérifier si la session est active
-    final currentSession = _supabase.auth.currentSession;
-    if (currentSession == null) {
-      debugPrint('ERREUR: Aucune session active après inscription');
-      
-      // Si l'email de confirmation est requis, nous pouvons quand même retourner un utilisateur
-      return UserModel(
-        id: userId,
-        pseudo: pseudo,
-        firstName: firstName,
-        birthDate: userBirthDate,
-        gender: gender,
-      );
-    }
-
-    debugPrint('Session active. Token: ${currentSession.accessToken.substring(0, 10)}...');
-
+Future<UserModel?> signUp({
+    required String email,
+    required String password,
+    required String pseudo,
+    String? firstName,
+    DateTime? birthDate, // Ajout du paramètre birthDate
+    String gender = 'No Answer',
+  }) async {
     try {
-      // Préparer les données utilisateur
-      final userData = {
-        'id': userId,
-        'pseudo': pseudo,
-        'first_name': firstName,
-        'birth_date': formattedBirthDate,
-        'gender': gender,
-      };
+      // Vérifier que firstName n'est pas null ou vide (car NOT NULL dans la base)
+      final String validFirstName = (firstName?.isNotEmpty == true) 
+          ? firstName! 
+          : "Utilisateur"; // Valeur par défaut si non fournie
       
-      debugPrint('Tentative d\'insertion des données: $userData');
+      // Utiliser la date fournie ou la date actuelle si non fournie
+      final DateTime validBirthDate = birthDate ?? DateTime(2000, 1, 1);
       
-      // Utiliser une requête directe
-      final result = await _supabase.from('app_user').insert(userData).select();
-      debugPrint('Insertion réussie. Résultat: $result');
-      
-      // Retourner le modèle d'utilisateur
-      return UserModel(
-        id: userId,
-        pseudo: pseudo,
-        firstName: firstName,
-        birthDate: userBirthDate,
-        gender: gender,
-        inscriptionDate: DateTime.now(),
+      // 1. Créer le compte d'authentification
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'pseudo': pseudo,
+          'first_name': validFirstName,
+        },
       );
-    } catch (insertError) {
-      // Afficher l'erreur d'insertion complète
-      debugPrint('Erreur détaillée lors de l\'insertion: $insertError');
+
+      if (response.user == null) {
+        throw Exception('Échec de création du compte');
+      }
+
+      final userId = response.user!.id;
       
-      // Vérifiez si confirmation d'e-mail requise
-      if (response.session == null) {
-        debugPrint('Aucune session: vérification par e-mail probablement requise');
+      // 2. Insérer dans app_user avec TOUS les champs obligatoires
+      try {
+        // Formater la date au format YYYY-MM-DD pour PostgreSQL
+        final formattedBirthDate = "${validBirthDate.year}-${validBirthDate.month.toString().padLeft(2, '0')}-${validBirthDate.day.toString().padLeft(2, '0')}";
+        
+        // Vérifier que le genre est valide
+        if (!['Male', 'Female', 'Other', 'No Answer'].contains(gender)) {
+          debugPrint('Genre invalide: $gender, utilisation de la valeur par défaut');
+          gender = 'No Answer';
+        } else {
+          debugPrint('Genre valide: $gender');
+        }
+
+        // Préparer les données utilisateur
+        final userData = {
+          'id': userId,
+          'pseudo': pseudo,
+          'first_name': validFirstName,
+          'birth_date': formattedBirthDate,
+          'gender': gender,
+          'inscription_date': DateTime.now().toIso8601String().split('T')[0], // Format YYYY-MM-DD
+        };
+
+        debugPrint('Données à insérer: $userData');
+
+        // Utiliser une requête directe
+        final result = await _supabase.from('app_user').insert(userData).select();
+        debugPrint('Insertion réussie. Résultat: $result');
+        
+        // Attendre un peu pour s'assurer que les données sont bien enregistrées
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // 3. Récupérer le profil utilisateur depuis la base de données
+        final userDataFromDb = await _supabase
+            .from('app_user')
+            .select()
+            .eq('id', userId)
+            .maybeSingle();
+            
+        if (userDataFromDb != null) {
+          debugPrint('Utilisateur créé avec succès: $userDataFromDb');
+          return UserModel.fromJson(userDataFromDb);
+        } else {
+          debugPrint('Utilisateur créé mais impossible de récupérer les données');
+          // Retourner un modèle minimal
+          return UserModel(
+            id: userId,
+            pseudo: pseudo,
+            firstName: validFirstName,
+            birthDate: validBirthDate,
+            inscriptionDate: DateTime.now(),
+          );
+        }
+      } catch (insertError) {
+        debugPrint('Erreur détaillée lors de l\'insertion: $insertError');
+        
+        // Même si l'insertion échoue, nous retournons un modèle utilisateur minimal
         return UserModel(
           id: userId,
           pseudo: pseudo,
-          firstName: firstName,
-          birthDate: userBirthDate,
-          gender: gender,
+          firstName: validFirstName,
+          birthDate: validBirthDate,
         );
       }
-      
-      throw Exception('Échec de l\'insertion du profil utilisateur');
+    } catch (e) {
+      debugPrint('Erreur d\'inscription détaillée: $e');
+      throw Exception('Échec de l\'inscription: $e');
     }
-  } catch (e) {
-    debugPrint('Erreur d\'inscription: $e');
-    throw Exception('Échec de l\'inscription: $e');
   }
-}
-
+  
   Future<void> signOut() async {
     try {
       await _supabase.auth.signOut();
