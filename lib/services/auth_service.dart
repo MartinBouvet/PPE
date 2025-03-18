@@ -1,63 +1,45 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/user_model.dart';
-import '../utils/supabase_helper.dart';
-import 'preferences_service.dart';
+import 'package:flutter/foundation.dart';
 
-/// Service de gestion de l'authentification
-class AuthService {
-  static final _supabase = SupabaseConfig.client;
+class AuthRepository {
+  final _supabase = SupabaseConfig.client;
 
-  /// Vérifie si un utilisateur est actuellement connecté
-  static bool isUserLoggedIn() {
-    return _supabase.auth.currentUser != null;
-  }
-
-  /// Récupère l'ID de l'utilisateur actuel ou null si non connecté
-  static String? getCurrentUserId() {
-    return _supabase.auth.currentUser?.id;
-  }
-
-  /// Récupère l'email de l'utilisateur actuel ou null si non connecté
-  static String? getCurrentUserEmail() {
-    return _supabase.auth.currentUser?.email;
-  }
-
-  /// Récupère le profil complet de l'utilisateur actuel depuis la base de données
-  static Future<UserModel?> getCurrentUserProfile() async {
+  Future<UserModel?> getCurrentUser() async {
     try {
-      final userId = getCurrentUserId();
-      if (userId == null) return null;
+      final authUser = _supabase.auth.currentUser;
+      if (authUser == null) {
+        return null;
+      }
 
-      final userData =
-          await _supabase.from('app_user').select().eq('id', userId).single();
+      final userData = await _supabase
+          .from('app_user') // Vérifiez que c'est bien 'app_user' et pas 'user'
+          .select()
+          .eq('id', authUser.id)
+          .maybeSingle();
+
+      if (userData == null) {
+        // Utilisateur authentifié mais sans profil
+        return UserModel(id: authUser.id);
+      }
 
       return UserModel.fromJson(userData);
     } catch (e) {
       debugPrint('Erreur lors de la récupération du profil: $e');
-
-      // Si l'erreur indique que l'utilisateur n'existe pas dans la table app_user
-      // mais qu'il est bien authentifié, retournons un modèle minimal
-      if (e.toString().contains('Row not found') && isUserLoggedIn()) {
-        final userId = getCurrentUserId();
-        final email = getCurrentUserEmail();
-
-        if (userId != null) {
-          return UserModel(
-            id: userId,
-            pseudo: email?.split('@').first ?? 'Utilisateur',
-          );
-        }
+      // Si l'utilisateur existe dans auth mais pas dans app_user
+      final authUser = _supabase.auth.currentUser;
+      if (authUser != null) {
+        return UserModel(id: authUser.id);
       }
-
       return null;
     }
   }
 
-  /// Connexion avec email et mot de passe
-  static Future<UserModel?> signInWithEmailPassword(
-      String email, String password) async {
+  Future<UserModel?> signIn({
+    required String email,
+    required String password,
+  }) async {
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email,
@@ -65,86 +47,145 @@ class AuthService {
       );
 
       if (response.user != null) {
-        // Sauvegarder l'ID utilisateur dans les préférences
-        await PreferencesService.setLastUserId(response.user!.id);
-
-        // Récupérer et retourner le profil complet
-        return getCurrentUserProfile();
+        return getCurrentUser();
       }
       return null;
-    } on AuthException catch (e) {
-      // Gérer les erreurs d'authentification spécifiques
-      if (e.message.contains('Invalid login credentials')) {
-        throw Exception('Email ou mot de passe incorrect');
-      } else {
-        throw Exception('Erreur de connexion: ${e.message}');
-      }
     } catch (e) {
       debugPrint('Erreur de connexion: $e');
-      throw Exception('Erreur de connexion: $e');
+      throw Exception('Échec de la connexion: $e');
     }
   }
 
-  /// Inscription avec email et mot de passe
-  static Future<UserModel?> signUpWithEmailPassword({
+  Future<UserModel?> signUp({
     required String email,
     required String password,
     required String pseudo,
     String? firstName,
+    DateTime? birthDate,
+    required String gender,
   }) async {
     try {
-      // Créer le compte d'authentification
+      // 1. Créer le compte d'authentification
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
       );
 
-      if (response.user != null) {
-        // Date par défaut pour les champs obligatoires
-        final defaultDate = DateTime.now();
+      if (response.user == null) {
+        throw Exception('Échec de création du compte');
+      }
 
-        // Créer le profil utilisateur dans la table app_user
-        await _supabase.from('app_user').insert({
-          'id': response.user!.id,
+      final userId = response.user!.id;
+
+      // 2. Vérifier si l'utilisateur existe déjà dans app_user
+      final existingUser = await _supabase
+          .from('app_user')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (existingUser != null) {
+        // L'utilisateur existe déjà, pas besoin de l'insérer
+        return UserModel.fromJson(existingUser);
+      }
+
+      try {
+        // 3. Créer le profil utilisateur dans la table app_user
+        await _supabase.from('app_user').upsert({
+          'id': userId,
           'pseudo': pseudo,
           'first_name': firstName,
-          'birth_date': DateTime(2000, 1, 1).toIso8601String(),
-          'inscription_date': defaultDate.toIso8601String(),
-        });
+          'birth_date': birthDate?.toIso8601String() ?? DateTime(2000, 1, 1).toIso8601String(),
+          'gender': gender,
+          'inscription_date': DateTime.now().toIso8601String(),
+        }, onConflict: 'id');
 
-        // Sauvegarder l'ID utilisateur dans les préférences
-        await PreferencesService.setLastUserId(response.user!.id);
+        // 4. Attendre un peu pour s'assurer que les données sont bien enregistrées
+        await Future.delayed(const Duration(milliseconds: 500));
 
+        // 5. Récupérer le profil utilisateur
         return UserModel(
-          id: response.user!.id,
+          id: userId,
           pseudo: pseudo,
           firstName: firstName,
-          birthDate: DateTime(2000, 1, 1),
-          inscriptionDate: defaultDate,
+          birthDate: birthDate ?? DateTime(2000, 1, 1),
+          gender: gender,
+          inscriptionDate: DateTime.now(),
         );
-      }
-      return null;
-    } on AuthException catch (e) {
-      if (e.message.contains('already registered')) {
-        throw Exception('Cet email est déjà utilisé');
-      } else {
-        throw Exception('Erreur d\'inscription: ${e.message}');
+      } catch (insertError) {
+        debugPrint('Erreur lors de l\'insertion dans app_user: $insertError');
+        // Même si l'insertion échoue, nous retournons un modèle utilisateur minimal
+        // pour permettre à l'utilisateur d'accéder à l'application
+        return UserModel(
+          id: userId,
+          pseudo: pseudo,
+          firstName: firstName,
+          birthDate: birthDate,
+          gender: gender,
+        );
       }
     } catch (e) {
       debugPrint('Erreur d\'inscription: $e');
-      throw Exception('Erreur d\'inscription: $e');
+      throw Exception('Échec de l\'inscription: $e');
     }
   }
 
-  /// Déconnexion
-  static Future<void> signOut() async {
+  Future<void> signOut() async {
     try {
       await _supabase.auth.signOut();
     } catch (e) {
       debugPrint('Erreur lors de la déconnexion: $e');
-      throw Exception('Erreur lors de la déconnexion: $e');
+      throw Exception('Échec de la déconnexion: $e');
     }
   }
+
+  // Réinitialisation du mot de passe
+  Future<void> resetPassword(String email) async {
+    try {
+      await _supabase.auth.resetPasswordForEmail(email);
+    } on AuthException catch (e) {
+      throw Exception('Erreur de réinitialisation: ${e.message}');
+    } catch (e) {
+      debugPrint('Erreur de réinitialisation: $e');
+      throw Exception('Erreur de réinitialisation: $e');
+    }
+  }
+
+  // Modification du mot de passe
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _supabase.auth.updateUser(UserAttributes(
+        password: newPassword,
+      ));
+    } on AuthException catch (e) {
+      throw Exception('Erreur de modification: ${e.message}');
+    } catch (e) {
+      debugPrint('Erreur de modification: $e');
+      throw Exception('Erreur de modification du mot de passe: $e');
+    }
+  }
+
+  // Vérifier l'état de l'authentification et retourner l'utilisateur si connecté
+  Future<UserModel?> checkAuthState() async {
+    try {
+      final session = await _supabase.auth.currentSession;
+
+      if (session != null) {
+        // Session valide, récupérer le profil utilisateur
+        return getCurrentUser();
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la vérification de l\'authentification: $e');
+      return null;
+    }
+  }
+
+  // Récupérer l'état d'authentification sous forme de Stream pour la réactivité
+  Stream<AuthState> authStateChanges() {
+    return _supabase.auth.onAuthStateChange;
+  }
+}
 
   /// Réinitialisation du mot de passe
   static Future<void> resetPassword(String email) async {

@@ -1,6 +1,7 @@
 // lib/views/auth/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../repositories/auth_repository.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -19,6 +20,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _authRepository = AuthRepository();
 
+  DateTime _selectedDate = DateTime(2000, 1, 1); // Date par défaut
+  String _selectedGender = 'Male'; // Genre par défaut
+
+  // Liste des options de genre
+  final List<String> _genderOptions = ['Male', 'Female', 'Other'];
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -32,6 +39,35 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(1920),
+      lastDate: DateTime.now().subtract(const Duration(days: 365 * 16)), // Minimum 16 ans
+      helpText: 'Sélectionnez votre date de naissance',
+      cancelText: 'Annuler',
+      confirmText: 'Confirmer',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).primaryColor,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
   }
 
   Future<void> _signUp() async {
@@ -51,6 +87,8 @@ class _SignupScreenState extends State<SignupScreen> {
         password: _passwordController.text,
         pseudo: _pseudoController.text.trim(),
         firstName: _firstNameController.text.trim(),
+        birthDate: _selectedDate,
+        gender: _selectedGender,
       );
 
       if (user != null && mounted) {
@@ -206,6 +244,67 @@ class _SignupScreenState extends State<SignupScreen> {
                     fillColor: Colors.grey.shade50,
                   ),
                   textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 16),
+
+                // Sélecteur de date de naissance
+                InkWell(
+                  onTap: () => _selectDate(context),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Date de naissance',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(_selectedDate),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        const Icon(Icons.arrow_drop_down),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Sélecteur de genre
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: 'Genre',
+                    prefixIcon: const Icon(Icons.people),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  value: _selectedGender,
+                  items: _genderOptions.map((String gender) {
+                    return DropdownMenuItem<String>(
+                      value: gender,
+                      child: Text(gender),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedGender = newValue;
+                      });
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez sélectionner votre genre';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 
