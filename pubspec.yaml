@@ -12,7 +12,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  
+  font_awesome_flutter: ^10.7.0 # Remplace par la dernière version si besoin
+
   # Supabase
   supabase_flutter: ^1.10.25
   

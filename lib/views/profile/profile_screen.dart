@@ -16,6 +16,7 @@ import '../../services/image_service.dart';
 import '../../utils/test_data_initializer.dart';
 import 'edit_profile_screen.dart';
 import 'add_sport_screen.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
