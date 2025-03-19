@@ -24,10 +24,29 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color.fromARGB(255, 78, 122, 170),
+          foregroundColor: Colors.white, // Texte blanc pour tous les boutons
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20), // Plus d'espace horizontal et vertical
+        ),
+      ),
+      // Style pour les boutons texte également
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: const Color.fromARGB(255, 78, 122, 170),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        ),
+      ),
+      // Style pour les boutons outlined également
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color.fromARGB(255, 78, 122, 170),
+          side: const BorderSide(color: Color.fromARGB(255, 78, 122, 170)),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

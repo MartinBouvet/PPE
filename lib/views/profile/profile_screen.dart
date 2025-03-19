@@ -531,15 +531,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
 
-                      // Informations personnelles
-                      Container(
+
+                      // Statistics section
+                      Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Informations personnelles',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              'Statistiques',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 12),
                             Container(
@@ -555,45 +557,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 ],
                               ),
-                              child: Column(
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
                                 children: [
-                                  _buildInfoRow(
+                                  _buildStatCard(
                                     context,
-                                    Icons.person,
-                                    'Pseudo',
-                                    '@${_user?.pseudo ?? "Sans pseudo"}',
-                                    Colors.blue.shade100,
+                                    Icons.sports_tennis,
+                                    '${_userSports.length}',
+                                    'Sports',
+                                    Colors.blue.shade200,
                                   ),
-                                  const Divider(height: 24),
-                                  _buildInfoRow(
+                                  _buildStatCard(
                                     context,
-                                    Icons.cake,
-                                    'Date de naissance',
-                                    _user?.birthDate != null
-                                        ? DateFormat('dd MMMM yyyy', 'fr_FR').format(_user!.birthDate!)
-                                        : 'Non renseignée',
-                                    Colors.orange.shade100,
+                                    Icons.people,
+                                    '0',
+                                    'Partenaires',
+                                    Colors.green.shade200,
                                   ),
-                                  const Divider(height: 24),
-                                  _buildInfoRow(
+                                  _buildStatCard(
                                     context,
-                                    Icons.calendar_today,
-                                    'Membre depuis',
-                                    _user?.inscriptionDate != null
-                                        ? DateFormat('dd MMMM yyyy', 'fr_FR').format(_user!.inscriptionDate!)
-                                        : 'Date inconnue',
-                                    Colors.green.shade100,
+                                    Icons.location_on,
+                                    '0',
+                                    'Lieux',
+                                    Colors.orange.shade200,
                                   ),
-                                  if (_user?.gender != null && _user!.gender!.isNotEmpty) ...[
-                                    const Divider(height: 24),
-                                    _buildInfoRow(
-                                      context,
-                                      Icons.wc,
-                                      'Genre',
-                                      _getGenderText(_user!.gender!),
-                                      Colors.purple.shade100,
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
@@ -601,7 +589,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      // Sports Section
+// Sports Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -638,7 +626,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const SizedBox(height: 8),
-
                       // Sports list
                       _userSports.isEmpty
                           ? Padding(
@@ -796,7 +783,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         IconButton(
                                           icon:
                                               const Icon(Icons.delete_outline),
-                                          color: Colors.red,
+                                          color: Colors.red.shade700,
                                           onPressed: () {
                                             showDialog(
                                               context: context,
@@ -821,7 +808,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     child: const Text(
                                                       'Supprimer',
                                                       style: TextStyle(
-                                                          color: Colors.red),
+                                                          color: Color.fromARGB(255, 197, 57, 47)),
                                                     ),
                                                   ),
                                                 ],
@@ -979,16 +966,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
-                      // Statistics section
-                      Padding(
+
+                      // Informations personnelles
+                      Container(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Statistiques',
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold),
+                              'Informations personnelles',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 12),
                             Container(
@@ -1005,30 +992,145 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ],
                               ),
                               child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
                                 children: [
-                                  _buildStatCard(
-                                    context,
-                                    Icons.sports_tennis,
-                                    '${_userSports.length}',
-                                    'Sports',
-                                    Colors.blue.shade200,
+                                  // Pseudo
+                                  Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.person,
+                                          color: Colors.blue.shade700,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        '@${_user?.pseudo ?? ""}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        'Pseudo',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  _buildStatCard(
-                                    context,
-                                    Icons.people,
-                                    '0',
-                                    'Partenaires',
-                                    Colors.green.shade200,
+                                  
+                                  // Date de naissance
+                                  Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.cake,
+                                          color: Colors.orange.shade700,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _user?.birthDate != null
+                                            ? DateFormat('dd/MM/yyyy').format(_user!.birthDate!)
+                                            : '-',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Naissance',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  _buildStatCard(
-                                    context,
-                                    Icons.location_on,
-                                    '0',
-                                    'Lieux',
-                                    Colors.orange.shade200,
+                                  
+                                  // Membre depuis
+                                  Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.calendar_today,
+                                          color: Colors.green.shade700,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _user?.inscriptionDate != null
+                                            ? DateFormat('dd/MM/yyyy').format(_user!.inscriptionDate!)
+                                            : '-',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Inscription',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  
+                                  // Genre (si disponible)
+                                  if (_user?.gender != null && _user!.gender!.isNotEmpty)
+                                    Column(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.purple.shade100,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.wc,
+                                            color: Colors.purple.shade700,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _getGenderText(_user!.gender!),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Genre',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),
