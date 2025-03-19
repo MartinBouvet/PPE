@@ -2,10 +2,17 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
+  // Couleur de fond claire pour les listes et conteneurs
+  static const Color listBackground = Colors.white;
+  
   static ThemeData get lightTheme {
     return ThemeData(
       primaryColor: const Color.fromARGB(255, 78, 122, 170), // Bleu visible dans vos mockups
       scaffoldBackgroundColor: Colors.white,
+      
+      // Ajout de ce paramètre pour les fonds de listes
+      canvasColor: listBackground,
+      
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -66,6 +73,19 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 4,
       ),
+
+      // A voir si ca fonctionne
+      // Personnalisation des listes
+      listTileTheme: const ListTileThemeData(
+        tileColor: listBackground,
+        selectedTileColor: Color(0xFFE3F2FD), // Bleu très clair quand sélectionné
+      ),
     );
+  }
+  
+  // Méthode utilitaire pour obtenir une version claire de la couleur primaire sans teinte violette
+  static Color getLightPrimaryColor(BuildContext context) {
+    // Utiliser un bleu clair prédéfini au lieu de l'opacité
+    return Colors.blue.shade50;
   }
 }

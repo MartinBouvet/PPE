@@ -589,7 +589,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-// Sports Section
+      // Sports Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -626,7 +626,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const SizedBox(height: 8),
-                      // Sports list
+                    
+             // Sports list
                       _userSports.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(16),
@@ -664,166 +665,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _userSports.length,
-                              itemBuilder: (context, index) {
-                                final sportUser = _userSports[index];
-                                final sport = _sportsMap[sportUser.sportId];
+                         : ListView.builder( 
+                          padding: const EdgeInsets.all(16), 
+                          shrinkWrap: true, 
+                          physics: const NeverScrollableScrollPhysics(), 
+                          itemCount: _userSports.length, 
+                          itemBuilder: (context, index) { 
+                            final sportUser = _userSports[index]; 
+                            final sport = _sportsMap[sportUser.sportId];
 
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+						              return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.shade300,
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                // Sport icon avec un fond blanc pour mieux ressortir
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withOpacity(0),
+                                    shape: BoxShape.circle,
                                   ),
-                                  elevation: 2,
+                                  child: sport?.logo != null
+                                ? Image.network(
+                                    sport!.logo!, 
+                                    width: 60,  // Taille plus grande
+                                    height: 60, 
+                                    fit: BoxFit.contain, // Ajuste sans bord blanc
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Icon(
+                                        Icons.sports, 
+                                        color: Theme.of(context).primaryColor,
+                                        size: 50, // Icône de fallback plus grande
+                                      );
+                                    },
+                                  )
+                                : Icon(
+                                    Icons.sports, 
+                                    color: Theme.of(context).primaryColor,
+                                    size: 50, // Icône de fallback plus grande
+                                  ),
+                                ),
+                                // Sport details
+                                Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Sport icon
-                                        Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .primaryColor
-                                                .withOpacity(0.1),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: sport?.logo != null
-                                            ? Image.network(
-                                                sport!.logo!, 
-                                                width: 44, 
-                                                height: 44, 
-                                                fit: BoxFit.contain,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Icon(
-                                                    Icons.sports, 
-                                                    color: Theme.of(context).primaryColor
-                                                  );
-                                                },
-                                              )
-                                            : Icon(
-                                                Icons.sports, 
-                                                color: Theme.of(context).primaryColor
+                                        Row(
+                                          children: [
+                                            Text(
+                                              sport?.name ?? 'Sport #${sportUser.sportId}',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                        ),
-                                        // Sport details
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    sport?.name ??
-                                                        'Sport #${sportUser.sportId}',
-                                                    style: const TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  if (sportUser
-                                                      .lookingForPartners) ...[
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors
-                                                            .green.shade100,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
-                                                      ),
-                                                      child: Text(
-                                                        'Recherche',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors
-                                                              .green.shade800,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                              if (sportUser.skillLevel !=
-                                                  null) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Niveau: ${sportUser.skillLevel}',
+                                            ),
+                                            if (sportUser.lookingForPartners) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green.shade100,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  'Recherche',
                                                   style: TextStyle(
-                                                    color: Colors.grey.shade600,
+                                                    fontSize: 12,
+                                                    color: Colors.green.shade800,
                                                   ),
                                                 ),
-                                              ],
-                                              if (sportUser.clubName != null &&
-                                                  sportUser.clubName!
-                                                      .isNotEmpty) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Club: ${sportUser.clubName}',
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                ),
-                                              ],
+                                              ),
                                             ],
+                                          ],
+                                        ),
+                                        if (sportUser.skillLevel != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Niveau: ${sportUser.skillLevel}',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                            ),
                                           ),
-                                        ),
-                                        // Delete button
-                                        IconButton(
-                                          icon:
-                                              const Icon(Icons.delete_outline),
-                                          color: Colors.red.shade700,
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text(
-                                                    'Supprimer le sport'),
-                                                content: Text(
-                                                    'Êtes-vous sûr de vouloir supprimer ${sport?.name ?? "ce sport"} de votre profil?'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(context),
-                                                    child:
-                                                        const Text('Annuler'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                      _removeSport(
-                                                          sportUser.sportId);
-                                                    },
-                                                    child: const Text(
-                                                      'Supprimer',
-                                                      style: TextStyle(
-                                                          color: Color.fromARGB(255, 197, 57, 47)),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
+                                        ],
+                                        if (sportUser.clubName != null && sportUser.clubName!.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Club: ${sportUser.clubName}',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
-                                );
-                              },
+                                ),
+                                // Delete button sans fond blanc
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  color: Colors.red,
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Supprimer le sport'),
+                                        content: Text(
+                                            'Êtes-vous sûr de vouloir supprimer ${sport?.name ?? "ce sport"} de votre profil?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: const Text('Annuler'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              _removeSport(sportUser.sportId);
+                                            },
+                                            child: const Text(
+                                              'Supprimer',
+                                              style: TextStyle(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
+                          ),
+                        );
+                      },
+                    ),
 
-                      // Badges Section
+                     
+                     // Badges Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -902,11 +896,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       children: [
                                         // Badge icon/logo
                                         Container(
-                                          padding: const EdgeInsets.all(12),
+                                          padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
                                             color: Theme.of(context)
                                                 .primaryColor
-                                                .withOpacity(0.1),
+                                                .withOpacity(0),
                                             shape: BoxShape.circle,
                                           ),
                                           child: badge['logo'] != null
