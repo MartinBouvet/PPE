@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_user_model.dart';
 import '../../models/sport_model.dart';
@@ -31,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UserModel? _user;
   List<SportUserModel> _userSports = [];
   Map<int, SportModel> _sportsMap = {};
+  List<Map<String, dynamic>> _userBadges = [];
   bool _isLoading = true;
   bool _isUploadingImage = false;
   String? _errorMessage;
@@ -38,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('fr_FR', null);
     _loadUserData();
   }
 
@@ -75,6 +79,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         for (var sport in allSports) {
           sportsMap[sport.id] = sport;
         }
+
+        await _loadUserBadges();
 
         setState(() {
           _sportsMap = sportsMap;
@@ -185,6 +191,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadUserBadges() async {
+    try {
+      final badges = await _userRepository.getUserBadges(_user!.id);
+      setState(() {
+        _userBadges = badges;
+      });
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des badges: $e');
+    }
+  }
+
   Future<void> _initializeTestData() async {
     try {
       // Afficher un indicateur de chargement
@@ -240,6 +257,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       }
+    }
+  }
+
+  String _getGenderText(String genderCode) {
+    switch (genderCode) {
+      case 'M':
+      case 'Male':
+        return 'Homme';
+      case 'F':
+      case 'Female':
+        return 'Femme';
+      case 'O':
+      case 'Other':
+        return 'Autre';
+      case 'U':
+      case 'No Answer':
+        return 'Non précisé';
+      default:
+        return 'Non précisé';
     }
   }
 
@@ -495,6 +531,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
 
+                      // Informations personnelles
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Informations personnelles',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.shade200,
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildInfoRow(
+                                    context,
+                                    Icons.person,
+                                    'Pseudo',
+                                    '@${_user?.pseudo ?? "Sans pseudo"}',
+                                    Colors.blue.shade100,
+                                  ),
+                                  const Divider(height: 24),
+                                  _buildInfoRow(
+                                    context,
+                                    Icons.cake,
+                                    'Date de naissance',
+                                    _user?.birthDate != null
+                                        ? DateFormat('dd MMMM yyyy', 'fr_FR').format(_user!.birthDate!)
+                                        : 'Non renseignée',
+                                    Colors.orange.shade100,
+                                  ),
+                                  const Divider(height: 24),
+                                  _buildInfoRow(
+                                    context,
+                                    Icons.calendar_today,
+                                    'Membre depuis',
+                                    _user?.inscriptionDate != null
+                                        ? DateFormat('dd MMMM yyyy', 'fr_FR').format(_user!.inscriptionDate!)
+                                        : 'Date inconnue',
+                                    Colors.green.shade100,
+                                  ),
+                                  if (_user?.gender != null && _user!.gender!.isNotEmpty) ...[
+                                    const Divider(height: 24),
+                                    _buildInfoRow(
+                                      context,
+                                      Icons.wc,
+                                      'Genre',
+                                      _getGenderText(_user!.gender!),
+                                      Colors.purple.shade100,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Sports Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -599,13 +705,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 .withOpacity(0.1),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: Icon(
-                                            Icons.sports,
-                                            color:
-                                                Theme.of(context).primaryColor,
-                                          ),
+                                          child: sport?.logo != null
+                                            ? Image.network(
+                                                sport!.logo!, 
+                                                width: 44, 
+                                                height: 44, 
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Icon(
+                                                    Icons.sports, 
+                                                    color: Theme.of(context).primaryColor
+                                                  );
+                                                },
+                                              )
+                                            : Icon(
+                                                Icons.sports, 
+                                                color: Theme.of(context).primaryColor
+                                              ),
                                         ),
-                                        const SizedBox(width: 16),
                                         // Sport details
                                         Expanded(
                                           child: Column(
@@ -719,6 +836,149 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               },
                             ),
 
+                      // Badges Section
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Mes badges',
+                              style: TextStyle(
+                                fontSize: 18, 
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      _userBadges.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.emoji_events,
+                                        size: 48,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Aucun badge obtenu pour le moment',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Continuez à pratiquer vos sports pour gagner des badges !',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _userBadges.length,
+                              itemBuilder: (context, index) {
+                                final badgeData = _userBadges[index];
+                                final badge = badgeData['badge'];
+                                final dateObtained = DateTime.parse(badgeData['date_obtained']);
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 2,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Row(
+                                      children: [
+                                        // Badge icon/logo
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .primaryColor
+                                                .withOpacity(0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: badge['logo'] != null
+                                            ? Image.network(
+                                                badge['logo'], 
+                                                width: 24, 
+                                                height: 24, 
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Icon(
+                                                    Icons.emoji_events, 
+                                                    color: Theme.of(context).primaryColor
+                                                  );
+                                                },
+                                              )
+                                            : Icon(
+                                                Icons.emoji_events, 
+                                                color: Theme.of(context).primaryColor
+                                              ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        // Badge details
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                badge['name'],
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                badge['description'],
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Obtenu le ${DateFormat('dd/MM/yyyy').format(dateObtained)}',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                       // Statistics section
                       Padding(
                         padding: const EdgeInsets.all(16),
@@ -905,4 +1165,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
+
+  Widget _buildInfoRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    Color iconBgColor,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconBgColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: iconBgColor.withOpacity(1.0),
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
+
