@@ -339,7 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 slivers: [
                   // AppBar flexible avec photo de profil
                   SliverAppBar(
-                    expandedHeight: 240,
+                    expandedHeight: 215,
                     pinned: true,
                     actions: [
                       IconButton(
@@ -379,66 +379,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Theme.of(context).primaryColor,
                                   Theme.of(context)
                                       .primaryColor
-                                      .withOpacity(0.7),
+                                      .withOpacity(0.5),
                                 ],
                               ),
                             ),
                           ),
                           // Profile image
-                          Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                GestureDetector(
-                                  onTap: _pickAndUploadImage,
-                                  child: Stack(
-                                    children: [
-                                      _isUploadingImage
-                                          ? const CircleAvatar(
-                                              radius: 60,
-                                              backgroundColor: Colors.white54,
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            )
-                                          : CircleAvatar(
-                                              radius: 60,
-                                              backgroundColor: Colors.white,
-                                              backgroundImage: _user?.photo !=
-                                                      null
-                                                  ? CachedNetworkImageProvider(
-                                                          _user!.photo!)
-                                                      as ImageProvider
-                                                  : null,
-                                              child: _user?.photo == null
-                                                  ? const Icon(Icons.person,
-                                                      size: 60,
-                                                      color: Colors.blue)
-                                                  : null,
+                          Padding(
+                          padding: const EdgeInsets.only(bottom: 40), // Ajouter un padding en bas
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GestureDetector(
+                                    onTap: _pickAndUploadImage,
+                                    child: Stack(
+                                      children: [
+                                        _isUploadingImage
+                                            ? const CircleAvatar(
+                                                radius: 60,
+                                                backgroundColor: Colors.white54,
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              )
+                                            : CircleAvatar(
+                                                radius: 60,
+                                                backgroundColor: Colors.white,
+                                                backgroundImage: _user?.photo !=
+                                                        null
+                                                    ? CachedNetworkImageProvider(
+                                                            _user!.photo!)
+                                                        as ImageProvider
+                                                    : null,
+                                                child: _user?.photo == null
+                                                    ? const Icon(Icons.person,
+                                                        size: 60,
+                                                        color: Colors.blue)
+                                                    : null,
+                                              ),
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Theme.of(context).primaryColor,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                  color: Colors.white, width: 2),
                                             ),
-                                      Positioned(
-                                        bottom: 0,
-                                        right: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Theme.of(context).primaryColor,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                                color: Colors.white, width: 2),
-                                          ),
-                                          child: const Icon(
-                                            Icons.camera_alt,
-                                            color: Colors.white,
-                                            size: 20,
+                                            child: const Icon(
+                                              Icons.camera_alt,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                
-                              ],
+                                  
+                                ],
+                              ),
                             ),
                           ),
                           // Overlay gradient for better text readability
