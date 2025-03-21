@@ -43,19 +43,22 @@ class UserRepository {
   }
 
   Future<List<Map<String, dynamic>>> getUserBadges(String userId) async {
-    try {
-      final response = await _supabase
-          .from('badge_user')
-          .select('id_badge, date_obtained, badge(name, logo, description)')
-          .eq('id_user', userId)
-          .eq('displayed_on_profile', true);
+  try {
+    final response = await _supabase
+        .from('badge_user')
+        .select('id_badge, date_obtained, badge(name, logo, description)')
+        .eq('id_user', userId)
+        .eq('displayed_on_profile', true);
 
-      return response;
-    } catch (e) {
-      debugPrint('Erreur lors du chargement des badges: $e');
-      return [];
-    }
+    // Convertir explicitement la réponse en List<Map<String, dynamic>>
+    return List<Map<String, dynamic>>.from(
+      response.map((item) => Map<String, dynamic>.from(item))
+    );
+  } catch (e) {
+    debugPrint('Erreur lors du chargement des badges: $e');
+    return [];
   }
+}
 
   // Méthode améliorée pour mettre à jour le profil utilisateur
   Future<bool> updateUserProfile(

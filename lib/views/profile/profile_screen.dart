@@ -437,17 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ],
                                   ),
                                 ),
-                                if (_user?.firstName != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 16),
-                                    child: Text(
-                                      _user?.firstName ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                  ),
+                                
                               ],
                             ),
                           ),
@@ -760,7 +750,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         if (sportUser.skillLevel != null) ...[
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Niveau: ${sportUser.skillLevel}',
+                                            'Niveau : ${sportUser.skillLevel}',
                                             style: TextStyle(
                                               color: Colors.grey.shade600,
                                             ),
@@ -769,7 +759,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         if (sportUser.clubName != null && sportUser.clubName!.isNotEmpty) ...[
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Club: ${sportUser.clubName}',
+                                            'Club : ${sportUser.clubName}',
                                             style: TextStyle(
                                               color: Colors.grey.shade600,
                                             ),
@@ -819,12 +809,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                      
                      // Badges Section
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Mes badges',
                               style: TextStyle(
                                 fontSize: 18, 
@@ -885,12 +875,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 final badge = badgeData['badge'];
                                 final dateObtained = DateTime.parse(badgeData['date_obtained']);
 
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  shape: RoundedRectangleBorder(
+                                return Container(
+                                 margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.shade300,
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  elevation: 2,
                                   child: Padding(
                                     padding: const EdgeInsets.all(16),
                                     child: Row(
@@ -907,8 +904,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           child: badge['logo'] != null
                                             ? Image.network(
                                                 badge['logo'], 
-                                                width: 24, 
-                                                height: 24, 
+                                                width: 60, 
+                                                height: 60, 
                                                 fit: BoxFit.contain,
                                                 errorBuilder: (context, error, stackTrace) {
                                                   return Icon(
@@ -1006,7 +1003,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        '@${_user?.pseudo ?? ""}',
+                                        '${_user?.firstName}',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -1014,7 +1011,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        'Pseudo',
+                                        'Prénom',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey.shade600,

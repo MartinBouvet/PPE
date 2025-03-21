@@ -3,93 +3,111 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../config/supabase_config.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 
 class ImageService {
   final _supabase = SupabaseConfig.client;
+  static const String _bucket = 'bucket_user';
+  static const String _folder = 'photo_profile';
 
   Future<String?> uploadProfileImage(File imageFile, String userId) async {
+  try {
+    // Vérifiez l'authentification
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser == null) {
+      debugPrint('Erreur : Aucun utilisateur connecté');
+      return null;
+    }
+
+    debugPrint('Utilisateur connecté: ${currentUser.id}');
+    
+    // Générer un nom de fichier unique
+    final fileExt = path.extension(imageFile.path);
+    final fileName = '$_folder/profile_${userId}_${const Uuid().v4()}$fileExt';
+    
+    debugPrint('Nom de fichier généré: $fileName');
+    
+    // Lire le fichier en bytes
+    Uint8List bytes = await imageFile.readAsBytes();
+    debugPrint('Taille de l\'image: ${bytes.length} bytes');
+
+    // Redimensionner et compresser l'image si nécessaire
+    final resizedImage = _resizeImage(bytes);
+    debugPrint('Taille après redimensionnement: ${resizedImage.length} bytes');
+
     try {
-      debugPrint(
-          'Début du téléchargement de l\'image de profil pour l\'utilisateur $userId');
-      final fileExt = path.extension(imageFile.path);
-      final fileName = 'profile_${userId}_${const Uuid().v4()}$fileExt';
+      // Vérifiez les buckets disponibles
+      final buckets = await _supabase.storage.listBuckets();
+      debugPrint('Buckets disponibles: ${buckets.map((b) => b.name).toList()}');
+    } catch (e) {
+      debugPrint('Erreur lors de la liste des buckets: $e');
+    }
 
-      // Lire le fichier en bytes
-      final bytes = await imageFile.readAsBytes();
-
-      // Vérifier la taille de l'image
-      debugPrint('Taille de l\'image: ${bytes.length} bytes');
-
-      // Si l'image est trop grande, la redimensionner
-      Uint8List uploadBytes = bytes;
-      if (bytes.length > 5 * 1024 * 1024) {
-        // Plus de 5MB
-        debugPrint('Image trop grande, compression nécessaire');
-        // Dans une vraie app, on utiliserait flutter_image_compress pour redimensionner
-        // Pour cette démo, on continuera avec l'image originale
-      }
-
-      // Upload via Supabase Storage (sans options spécifiques)
-      await _supabase.storage.from('profiles').uploadBinary(
-            fileName,
-            uploadBytes,
-          );
-
-      debugPrint('Image téléchargée, génération de l\'URL publique');
+    // Upload dans le bucket
+    try {
+      await _supabase.storage.from(_bucket).uploadBinary(
+        fileName,
+        resizedImage,
+        fileOptions: FileOptions(
+          upsert: true,
+          contentType: 'image/jpeg',
+        ),
+      );
 
       // Obtenir l'URL publique
-      final imageUrl =
-          _supabase.storage.from('profiles').getPublicUrl(fileName);
-
+      final imageUrl = _supabase.storage.from(_bucket).getPublicUrl(fileName);
       debugPrint('URL de l\'image générée: $imageUrl');
 
-      // Vérifier si l'URL est accessible
-      try {
-        final response = await http.head(Uri.parse(imageUrl));
-        if (response.statusCode != 200) {
-          debugPrint(
-              'L\'URL de l\'image n\'est pas accessible: ${response.statusCode}');
-        } else {
-          debugPrint('L\'URL de l\'image est accessible');
-        }
-      } catch (e) {
-        debugPrint('Erreur lors de la vérification de l\'URL: $e');
-      }
-
       return imageUrl;
-    } catch (e) {
-      debugPrint('Erreur lors du téléchargement de l\'image de profil: $e');
+    } catch (uploadError) {
+      debugPrint('Détails complets de l\'erreur d\'upload: $uploadError');
+      return null;
+    }
+  } catch (e) {
+    debugPrint('Erreur globale lors de l\'upload: $e');
+    return null;
+  }
+}
 
-      // Essai alternatif: upload avec un chemin différent
-      try {
-        final fileExt = path.extension(imageFile.path);
-        final fileName = 'user_photos/${userId}_${const Uuid().v4()}$fileExt';
-
-        final bytes = await imageFile.readAsBytes();
-
-        await _supabase.storage.from('bucket_image').uploadBinary(
-              fileName,
-              bytes,
-            );
-
-        final imageUrl =
-            _supabase.storage.from('bucket_image').getPublicUrl(fileName);
-        debugPrint('URL de l\'image (méthode alternative): $imageUrl');
-
-        return imageUrl;
-      } catch (alternativeError) {
-        debugPrint(
-            'Erreur lors du téléchargement alternatif: $alternativeError');
-
-        // En dernier recours, utiliser une URL d'image par défaut
-        return 'https://ui-avatars.com/api/?name=${userId.substring(0, 2)}&background=random';
+  // Méthode de redimensionnement d'image
+  Uint8List _resizeImage(Uint8List bytes, {int maxWidth = 800, int maxHeight = 800, int quality = 85}) {
+    try {
+      // Décoder l'image
+      final image = img.decodeImage(bytes);
+      
+      if (image == null) {
+        debugPrint('Impossible de décoder l\'image');
+        return bytes;
       }
+
+      // Redimensionner si nécessaire
+      img.Image resizedImage;
+      if (image.width > maxWidth || image.height > maxHeight) {
+        resizedImage = img.copyResize(
+          image, 
+          width: maxWidth,
+          height: maxHeight,
+          interpolation: img.Interpolation.average,
+        );
+      } else {
+        resizedImage = image;
+      }
+
+      // Compresser l'image
+      return Uint8List.fromList(
+        img.encodeJpg(resizedImage, quality: quality)
+      );
+    } catch (e) {
+      debugPrint('Erreur lors du redimensionnement de l\'image: $e');
+      return bytes;
     }
   }
 
+  // Méthode de suppression 
   Future<bool> deleteProfileImage(String imageUrl) async {
     try {
       // Extraction du nom de fichier depuis l'URL
@@ -97,35 +115,23 @@ class ImageService {
       final pathSegments = uri.pathSegments;
 
       if (pathSegments.isEmpty) {
-        debugPrint(
-            'Impossible d\'extraire le nom de fichier de l\'URL: $imageUrl');
+        debugPrint('Impossible d\'extraire le nom de fichier de l\'URL: $imageUrl');
         return false;
       }
 
-      final fileName = pathSegments.last;
-      debugPrint('Suppression de l\'image: $fileName');
+      // Pour les URL de bucket_user, trouver le chemin du fichier
+      final fullPath = pathSegments.join('/');
 
-      // Déterminer le bucket en fonction de l'URL
-      String bucket = 'profiles';
-      if (imageUrl.contains('bucket_image')) {
-        bucket = 'bucket_image';
-
-        // Pour le bucket_image, le chemin peut inclure des dossiers
-        if (pathSegments.length > 1) {
-          final folderPath =
-              pathSegments.sublist(pathSegments.length - 2).join('/');
-          await _supabase.storage.from(bucket).remove([folderPath]);
-          debugPrint('Image supprimée (avec chemin de dossier): $folderPath');
-          return true;
-        }
+      try {
+        await _supabase.storage.from(_bucket).remove([fullPath]);
+        debugPrint('Image supprimée: $fullPath');
+        return true;
+      } catch (e) {
+        debugPrint('Erreur lors de la suppression de l\'image: $e');
+        return false;
       }
-
-      // Suppression du fichier
-      await _supabase.storage.from(bucket).remove([fileName]);
-      debugPrint('Image supprimée: $fileName');
-      return true;
     } catch (e) {
-      debugPrint('Erreur lors de la suppression de l\'image: $e');
+      debugPrint('Erreur globale lors de la suppression de l\'image: $e');
       return false;
     }
   }
