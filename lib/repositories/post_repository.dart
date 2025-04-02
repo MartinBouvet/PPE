@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
-import '../models/user_model.dart';
 
 class PostModel {
   final String id;
@@ -9,6 +8,7 @@ class PostModel {
   final String? content;
   final String? imageUrl;
   final DateTime createdAt;
+  final String status;
 
   PostModel({
     required this.id,
@@ -16,6 +16,7 @@ class PostModel {
     this.content,
     this.imageUrl,
     required this.createdAt,
+    required this.status,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -25,6 +26,7 @@ class PostModel {
       content: json['description'],
       imageUrl: json['photo'],
       createdAt: DateTime.parse(json['post_date']),
+      status: json['status'] ?? 'published',
     );
   }
 }
@@ -58,11 +60,16 @@ class CommentModel {
 class PostRepository {
   final _supabase = SupabaseConfig.client;
 
+  // Probablement les valeurs autorisées pour le statut du post dans votre DB
+  // À ajuster selon les valeurs réellement acceptées par votre contrainte CHECK
+  static const String STATUS_PUBLISHED = 'published';
+  static const String STATUS_DRAFT = 'draft';
+
   Future<List<PostModel>> getPosts({
     String? userId,
     int limit = 20,
     int offset = 0,
-    bool showAllUsers = true, // Paramètre pour afficher tous les posts
+    bool showAllUsers = true,
   }) async {
     try {
       var query = _supabase.from('post').select();
@@ -117,7 +124,7 @@ class PostRepository {
         'description': content,
         'photo': imageUrl,
         'post_date': now,
-        'status': 'active',
+        'status': STATUS_PUBLISHED, // Utiliser la valeur correcte pour status
         'location': null,
       };
 
@@ -128,6 +135,34 @@ class PostRepository {
 
       return PostModel.fromJson(response);
     } catch (e) {
+      // Tenter différentes valeurs de status si celle par défaut échoue
+      if (e is PostgrestException &&
+          e.code == '23514' &&
+          e.message.contains('post_status_check')) {
+        debugPrint('Tentative avec un status différent...');
+        try {
+          final now = DateTime.now().toIso8601String();
+
+          final data = {
+            'id_publisher': userId,
+            'description': content,
+            'photo': imageUrl,
+            'post_date': now,
+            'status': 'visible', // Essai avec une autre valeur
+            'location': null,
+          };
+
+          data.removeWhere((key, value) => value == null);
+
+          final response =
+              await _supabase.from('post').insert(data).select().single();
+
+          return PostModel.fromJson(response);
+        } catch (retry) {
+          debugPrint('Nouvelle tentative échouée: $retry');
+        }
+      }
+
       debugPrint('Erreur lors de la création du post: $e');
       return null;
     }

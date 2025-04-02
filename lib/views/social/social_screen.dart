@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/user_model.dart';
-import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
-import '../../repositories/sport_repository.dart';
 import '../../repositories/post_repository.dart';
 import 'post_detail_screen.dart';
 import 'create_post_screen.dart';
@@ -20,16 +18,12 @@ class SocialScreen extends StatefulWidget {
 class _SocialScreenState extends State<SocialScreen> {
   final _authRepository = AuthRepository();
   final _userRepository = UserRepository();
-  final _sportRepository = SportRepository();
   final _postRepository = PostRepository();
 
   UserModel? _currentUser;
-  List<SportModel> _sports = [];
   List<PostModel> _posts = [];
   Map<String, UserModel?> _postAuthors = {};
-  Map<int, SportModel?> _sportsMap = {};
 
-  int? _selectedSportId;
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
@@ -52,12 +46,7 @@ class _SocialScreenState extends State<SocialScreen> {
     try {
       // Récupérer l'utilisateur actuel
       _currentUser = await _authRepository.getCurrentUser();
-
-      // Récupérer les sports
-      _sports = await _sportRepository.getAllSports();
-
-      // Créer un map pour référence rapide
-      _sportsMap = {for (var sport in _sports) sport.id: sport};
+      debugPrint('Utilisateur chargé: ${_currentUser?.id}');
 
       // Charger les posts
       await _refreshPosts();
@@ -66,6 +55,7 @@ class _SocialScreenState extends State<SocialScreen> {
         _errorMessage =
             'Erreur lors du chargement des données: ${e.toString()}';
       });
+      debugPrint('Erreur de chargement des données: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -85,9 +75,10 @@ class _SocialScreenState extends State<SocialScreen> {
     try {
       // Récupérer les posts
       _posts = await _postRepository.getPosts(
-        sportId: _selectedSportId,
         limit: 50,
       );
+
+      debugPrint('Posts chargés: ${_posts.length}');
 
       // Charger les auteurs des posts
       for (final post in _posts) {
@@ -101,6 +92,7 @@ class _SocialScreenState extends State<SocialScreen> {
         }
       }
     } catch (e) {
+      debugPrint('Erreur lors du rafraîchissement des posts: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -115,14 +107,6 @@ class _SocialScreenState extends State<SocialScreen> {
         });
       }
     }
-  }
-
-  void _selectSport(int? sportId) {
-    setState(() {
-      _selectedSportId = sportId;
-      _posts = []; // Vider les posts lors du changement de filtre
-    });
-    _refreshPosts();
   }
 
   @override
@@ -172,36 +156,6 @@ class _SocialScreenState extends State<SocialScreen> {
       ),
       body: Column(
         children: [
-          // Filtres de sport
-          if (_sports.isNotEmpty)
-            Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  // Filtre "Tous"
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: const Text('Tous les sports'),
-                      selected: _selectedSportId == null,
-                      onSelected: (_) => _selectSport(null),
-                    ),
-                  ),
-                  // Filtres par sport
-                  ..._sports.map((sport) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(sport.name),
-                          selected: _selectedSportId == sport.id,
-                          onSelected: (_) => _selectSport(sport.id),
-                        ),
-                      )),
-                ],
-              ),
-            ),
-
           // Indicateur de chargement
           if (_isRefreshing) const LinearProgressIndicator(),
 
@@ -245,9 +199,7 @@ class _SocialScreenState extends State<SocialScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => CreatePostScreen(
-                                  initialSportId: _selectedSportId,
-                                ),
+                                builder: (context) => const CreatePostScreen(),
                               ),
                             ).then((value) {
                               if (value == true) {
@@ -268,9 +220,6 @@ class _SocialScreenState extends State<SocialScreen> {
                       itemBuilder: (context, index) {
                         final post = _posts[index];
                         final author = _postAuthors[post.userId];
-                        final sport = post.sportId != null
-                            ? _sportsMap[post.sportId]
-                            : null;
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
@@ -333,26 +282,6 @@ class _SocialScreenState extends State<SocialScreen> {
                                           ],
                                         ),
                                       ),
-                                      // Tag sport
-                                      if (sport != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade100,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            sport.name,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.blue.shade800,
-                                            ),
-                                          ),
-                                        ),
                                     ],
                                   ),
                                 ),
@@ -365,11 +294,12 @@ class _SocialScreenState extends State<SocialScreen> {
                                     child: CachedNetworkImage(
                                       imageUrl: post.imageUrl!,
                                       fit: BoxFit.cover,
-                                      placeholder: (context, url) => Center(
+                                      placeholder: (context, url) =>
+                                          const Center(
                                         child: CircularProgressIndicator(),
                                       ),
                                       errorWidget: (context, url, error) =>
-                                          Center(
+                                          const Center(
                                         child: Icon(Icons.error),
                                       ),
                                     ),
@@ -457,9 +387,7 @@ class _SocialScreenState extends State<SocialScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => CreatePostScreen(
-                initialSportId: _selectedSportId,
-              ),
+              builder: (context) => const CreatePostScreen(),
             ),
           ).then((value) {
             if (value == true) {

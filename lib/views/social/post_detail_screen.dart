@@ -289,22 +289,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   // Image du post avec gestion d'erreur robuste
                   if (_post!.imageUrl != null)
-                    ClipRRect(
-                      child: Container(
-                        height: 200,
-                        child: _post!.imageUrl!.contains('ui-avatars.com')
-                            ? Center(child: Text('Image non disponible'))
-                            : CachedNetworkImage(
-                                imageUrl: _post!.imageUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Center(
-                                  child: Icon(Icons.error),
-                                ),
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      child: _post!.imageUrl!.contains('ui-avatars.com')
+                          ? const Center(child: Text('Image non disponible'))
+                          : CachedNetworkImage(
+                              imageUrl: _post!.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
                               ),
-                      ),
+                              errorWidget: (context, url, error) =>
+                                  const Center(
+                                child: Icon(Icons.error),
+                              ),
+                            ),
                     ),
 
                   // Contenu du post

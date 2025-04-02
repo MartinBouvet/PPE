@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/sport_repository.dart';
 import '../../repositories/post_repository.dart';
 import '../../services/image_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
-  final int? initialSportId;
-
-  const CreatePostScreen({
-    Key? key,
-    this.initialSportId,
-  }) : super(key: key);
+  const CreatePostScreen({Key? key}) : super(key: key);
 
   @override
   _CreatePostScreenState createState() => _CreatePostScreenState();
@@ -24,12 +17,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _contentController = TextEditingController();
   final _authRepository = AuthRepository();
   final _postRepository = PostRepository();
-  final _sportRepository = SportRepository();
   final _imageService = ImageService();
 
   String? _userId;
-  List<SportModel> _sports = [];
-  int? _selectedSportId;
   File? _selectedImage;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -38,7 +28,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedSportId = widget.initialSportId;
     _loadData();
   }
 
@@ -58,7 +47,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       final user = await _authRepository.getCurrentUser();
 
       if (user != null) {
-        _userId = user.id;
+        setState(() {
+          _userId = user.id;
+          _isLoading = false;
+        });
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -67,19 +59,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           );
           Navigator.pop(context);
         }
-        return;
       }
-
-      _sports = await _sportRepository.getAllSports();
     } catch (e) {
       if (mounted) {
         setState(() {
           _errorMessage = 'Erreur: ${e.toString()}';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
           _isLoading = false;
         });
       }
@@ -122,9 +106,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
-    // Debug
-    debugPrint('Création d\'un post par l\'utilisateur: $_userId');
-
     setState(() {
       _isSaving = true;
       _errorMessage = null;
@@ -133,17 +114,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       String? imageUrl;
       if (_selectedImage != null) {
+        // Télécharger l'image
         imageUrl = await _imageService.uploadProfileImage(
           _selectedImage!,
           'post_${DateTime.now().millisecondsSinceEpoch}',
         );
+        debugPrint('Image téléchargée: $imageUrl');
       }
+
+      // Créer le post avec le contenu et l'URL de l'image
+      final content = _contentController.text.trim().isNotEmpty
+          ? _contentController.text.trim()
+          : null;
+
+      debugPrint(
+          'Création du post: userId=$_userId, content=$content, imageUrl=$imageUrl');
 
       final post = await _postRepository.createPost(
         userId: _userId!,
-        content: _contentController.text.trim().isNotEmpty
-            ? _contentController.text.trim()
-            : null,
+        content: content,
         imageUrl: imageUrl,
       );
 
@@ -155,19 +144,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       } else if (mounted) {
         setState(() {
           _errorMessage = 'Échec de la création du post';
+          _isSaving = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _errorMessage = 'Erreur: ${e.toString()}';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
           _isSaving = false;
         });
+
+        // Afficher un message d'erreur détaillé
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Erreur lors de la création du post: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -211,6 +206,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Message d'erreur
             if (_errorMessage != null)
               Container(
                 margin: const EdgeInsets.all(16),
@@ -232,35 +228,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ],
                 ),
               ),
-            // Suppression du sélecteur de sport puisque la colonne n'existe pas
-            /*
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: DropdownButtonFormField<int?>(
-                decoration: const InputDecoration(
-                  labelText: 'Sport (optionnel)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.sports),
-                ),
-                value: _selectedSportId,
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('Aucun sport spécifique'),
-                  ),
-                  ..._sports.map((sport) => DropdownMenuItem(
-                        value: sport.id,
-                        child: Text(sport.name),
-                      )),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedSportId = value;
-                  });
-                },
-              ),
-            ),
-            */
+
+            // Zone de texte
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -275,6 +244,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ),
             ),
+
+            // Aperçu de l'image
             if (_selectedImage != null)
               Stack(
                 children: [
@@ -313,15 +284,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                 ],
               ),
+
+            // Barre d'actions
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
+                  // Ajouter une image depuis la galerie
                   IconButton(
                     icon: const Icon(Icons.photo),
                     onPressed: _pickImage,
                     tooltip: 'Ajouter une image',
                   ),
+                  // Prendre une photo avec la caméra
                   IconButton(
                     icon: const Icon(Icons.camera_alt),
                     onPressed: () async {
@@ -342,6 +317,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     tooltip: 'Prendre une photo',
                   ),
                   const Spacer(),
+                  // Bouton de publication
                   ElevatedButton.icon(
                     onPressed: _isSaving ? null : _submitPost,
                     icon: const Icon(Icons.send),
