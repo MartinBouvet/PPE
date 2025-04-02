@@ -9,7 +9,6 @@ class PostModel {
   final String? content;
   final String? imageUrl;
   final DateTime createdAt;
-  final int? sportId;
 
   PostModel({
     required this.id,
@@ -17,7 +16,6 @@ class PostModel {
     this.content,
     this.imageUrl,
     required this.createdAt,
-    this.sportId,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -27,7 +25,6 @@ class PostModel {
       content: json['description'],
       imageUrl: json['photo'],
       createdAt: DateTime.parse(json['post_date']),
-      sportId: json['id_sport'],
     );
   }
 }
@@ -62,19 +59,16 @@ class PostRepository {
   final _supabase = SupabaseConfig.client;
 
   Future<List<PostModel>> getPosts({
-    int? sportId,
     String? userId,
     int limit = 20,
     int offset = 0,
+    bool showAllUsers = true, // Paramètre pour afficher tous les posts
   }) async {
     try {
       var query = _supabase.from('post').select();
 
-      if (sportId != null) {
-        query = query.eq('id_sport', sportId);
-      }
-
-      if (userId != null) {
+      // Filtrer par utilisateur seulement si showAllUsers est false
+      if (userId != null && !showAllUsers) {
         query = query.eq('id_publisher', userId);
       }
 
@@ -114,7 +108,6 @@ class PostRepository {
     required String userId,
     String? content,
     String? imageUrl,
-    int? sportId,
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
@@ -123,10 +116,9 @@ class PostRepository {
         'id_publisher': userId,
         'description': content,
         'photo': imageUrl,
-        'id_sport': sportId,
         'post_date': now,
         'status': 'active',
-        'location': null, // Champ obligatoire selon votre schéma
+        'location': null,
       };
 
       data.removeWhere((key, value) => value == null);
@@ -146,7 +138,6 @@ class PostRepository {
     required String userId,
     String? content,
     String? imageUrl,
-    int? sportId,
   }) async {
     try {
       final postCheck = await _supabase
@@ -161,7 +152,6 @@ class PostRepository {
       final updateData = <String, dynamic>{};
       if (content != null) updateData['description'] = content;
       if (imageUrl != null) updateData['photo'] = imageUrl;
-      if (sportId != null) updateData['id_sport'] = sportId;
 
       await _supabase.from('post').update(updateData).eq('id_post', postId);
 

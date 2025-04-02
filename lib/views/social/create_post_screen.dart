@@ -122,6 +122,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
+    // Debug
+    debugPrint('Création d\'un post par l\'utilisateur: $_userId');
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
@@ -142,7 +145,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ? _contentController.text.trim()
             : null,
         imageUrl: imageUrl,
-        sportId: _selectedSportId,
       );
 
       if (post != null && mounted) {
@@ -230,6 +232,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ],
                 ),
               ),
+            // Suppression du sélecteur de sport puisque la colonne n'existe pas
+            /*
             Padding(
               padding: const EdgeInsets.all(16),
               child: DropdownButtonFormField<int?>(
@@ -256,6 +260,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 },
               ),
             ),
+            */
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
