@@ -17,18 +17,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  // Nouvel ordre des écrans: Social -> Match -> Facility -> Chat -> Profile
   final List<Widget> _screens = [
-    const MatchScreen(), // Écran de découverte de partenaires sportifs
-    const FacilityScreen(), // Écran de recherche d'installations sportives
-    const SocialScreen(), // Écran de réseau social
-    const ChatScreen(), // Écran de messages
-    const ProfileScreen(), // Écran de profil
+    const SocialScreen(), // Nouvel ordre: 1. Fil social
+    const MatchScreen(), // Nouvel ordre: 2. Découverte de partenaires
+    const FacilityScreen(), // Nouvel ordre: 3. Installations sportives
+    const ChatScreen(), // Inchangé: 4. Messages
+    const ProfileScreen(), // Inchangé: 5. Profil
   ];
 
   final List<String> _titles = [
-    'Découvrir',
-    'Lieux',
     'Fil d\'actualité',
+    'Partenaires',
+    'Lieux',
     'Messages',
     'Profil',
   ];
@@ -47,16 +48,16 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
+            icon: Icon(Icons.public),
+            label: 'Social',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.handshake),
             label: 'Partenaires',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.location_on),
             label: 'Lieux',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.public),
-            label: 'Social',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
@@ -68,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      appBar: _currentIndex == 2
+      appBar: _currentIndex == 0
           ? // Only show for the social tab
           AppBar(
               title: Text(_titles[_currentIndex]),
