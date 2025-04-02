@@ -1,6 +1,4 @@
-// lib/views/social/social_screen.dart
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/user_model.dart';
@@ -41,7 +39,7 @@ class _SocialScreenState extends State<SocialScreen> {
     super.initState();
     _loadData();
 
-    // Initialize timeago localization
+    // Initialiser timeago pour le français
     timeago.setLocaleMessages('fr', timeago.FrMessages());
   }
 
@@ -52,18 +50,16 @@ class _SocialScreenState extends State<SocialScreen> {
     });
 
     try {
-      // Get current user
+      // Récupérer l'utilisateur actuel
       _currentUser = await _authRepository.getCurrentUser();
 
-      // Get all sports
+      // Récupérer les sports
       _sports = await _sportRepository.getAllSports();
 
-      // Create a map for quick lookup
-      for (final sport in _sports) {
-        _sportsMap[sport.id] = sport;
-      }
+      // Créer un map pour référence rapide
+      _sportsMap = {for (var sport in _sports) sport.id: sport};
 
-      // Load posts
+      // Charger les posts
       await _refreshPosts();
     } catch (e) {
       setState(() {
@@ -87,13 +83,13 @@ class _SocialScreenState extends State<SocialScreen> {
     });
 
     try {
-      // Get posts
+      // Récupérer les posts
       _posts = await _postRepository.getPosts(
         sportId: _selectedSportId,
         limit: 50,
       );
 
-      // Load post authors
+      // Charger les auteurs des posts
       for (final post in _posts) {
         if (!_postAuthors.containsKey(post.userId)) {
           final author = await _userRepository.getUserProfile(post.userId);
@@ -108,8 +104,8 @@ class _SocialScreenState extends State<SocialScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text('Erreur lors du chargement des posts: ${e.toString()}')),
+            content: Text('Erreur: ${e.toString()}'),
+          ),
         );
       }
     } finally {
@@ -124,7 +120,7 @@ class _SocialScreenState extends State<SocialScreen> {
   void _selectSport(int? sportId) {
     setState(() {
       _selectedSportId = sportId;
-      _posts = []; // Clear posts when changing sport filter
+      _posts = []; // Vider les posts lors du changement de filtre
     });
     _refreshPosts();
   }
@@ -154,7 +150,7 @@ class _SocialScreenState extends State<SocialScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => context.go('/login'),
+                onPressed: () => Navigator.pushNamed(context, '/login'),
                 child: const Text('Se connecter'),
               ),
             ],
@@ -170,12 +166,13 @@ class _SocialScreenState extends State<SocialScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isRefreshing ? null : _refreshPosts,
+            tooltip: 'Actualiser',
           ),
         ],
       ),
       body: Column(
         children: [
-          // Sport filter chips
+          // Filtres de sport
           if (_sports.isNotEmpty)
             Container(
               height: 60,
@@ -183,7 +180,7 @@ class _SocialScreenState extends State<SocialScreen> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  // "All" filter
+                  // Filtre "Tous"
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: FilterChip(
@@ -192,7 +189,7 @@ class _SocialScreenState extends State<SocialScreen> {
                       onSelected: (_) => _selectSport(null),
                     ),
                   ),
-                  // Sport filters
+                  // Filtres par sport
                   ..._sports.map((sport) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilterChip(
@@ -205,10 +202,10 @@ class _SocialScreenState extends State<SocialScreen> {
               ),
             ),
 
-          // Loading indicator for refreshing
+          // Indicateur de chargement
           if (_isRefreshing) const LinearProgressIndicator(),
 
-          // Error message
+          // Message d'erreur
           if (_errorMessage != null)
             Padding(
               padding: const EdgeInsets.all(16),
@@ -219,7 +216,7 @@ class _SocialScreenState extends State<SocialScreen> {
               ),
             ),
 
-          // Posts list
+          // Liste des posts
           Expanded(
             child: _posts.isEmpty
                 ? Center(
@@ -277,9 +274,7 @@ class _SocialScreenState extends State<SocialScreen> {
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
+                              horizontal: 16, vertical: 8),
                           child: InkWell(
                             onTap: () {
                               Navigator.push(
@@ -298,12 +293,12 @@ class _SocialScreenState extends State<SocialScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Post header
+                                // En-tête du post
                                 Padding(
                                   padding: const EdgeInsets.all(12),
                                   child: Row(
                                     children: [
-                                      // Author avatar
+                                      // Avatar de l'auteur
                                       CircleAvatar(
                                         backgroundImage: author?.photo != null
                                             ? CachedNetworkImageProvider(
@@ -314,7 +309,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                             : null,
                                       ),
                                       const SizedBox(width: 12),
-                                      // Author name and timestamp
+                                      // Nom de l'auteur et horodatage
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -338,7 +333,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                           ],
                                         ),
                                       ),
-                                      // Sport tag
+                                      // Tag sport
                                       if (sport != null)
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -362,7 +357,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                   ),
                                 ),
 
-                                // Post image
+                                // Image du post
                                 if (post.imageUrl != null)
                                   SizedBox(
                                     width: double.infinity,
@@ -380,7 +375,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                     ),
                                   ),
 
-                                // Post content
+                                // Contenu du post
                                 if (post.content != null)
                                   Padding(
                                     padding: const EdgeInsets.all(12),
@@ -391,7 +386,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                     ),
                                   ),
 
-                                // Post actions
+                                // Actions sur le post
                                 Padding(
                                   padding:
                                       const EdgeInsets.symmetric(horizontal: 8),
@@ -404,7 +399,6 @@ class _SocialScreenState extends State<SocialScreen> {
                                             const Icon(Icons.thumb_up_outlined),
                                         label: const Text('J\'aime'),
                                         onPressed: () {
-                                          // TODO: Implement like functionality
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             const SnackBar(
@@ -437,7 +431,6 @@ class _SocialScreenState extends State<SocialScreen> {
                                         icon: const Icon(Icons.share_outlined),
                                         label: const Text('Partager'),
                                         onPressed: () {
-                                          // TODO: Implement share functionality
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             const SnackBar(

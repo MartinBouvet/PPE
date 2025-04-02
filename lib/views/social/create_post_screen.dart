@@ -1,11 +1,10 @@
-// lib/views/social/create_post_screen.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../models/sport_model.dart';
 import '../../repositories/auth_repository.dart';
-import '../../repositories/post_repository.dart';
 import '../../repositories/sport_repository.dart';
+import '../../repositories/post_repository.dart';
 import '../../services/image_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
@@ -33,7 +32,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   int? _selectedSportId;
   File? _selectedImage;
   bool _isLoading = true;
-  bool _isSubmitting = false;
+  bool _isSaving = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -51,14 +51,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
       final user = await _authRepository.getCurrentUser();
+
       if (user != null) {
         _userId = user.id;
       } else {
-        // Navigate back if not logged in
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -69,13 +70,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         return;
       }
 
-      // Load sports
       _sports = await _sportRepository.getAllSports();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
+        setState(() {
+          _errorMessage = 'Erreur: ${e.toString()}';
+        });
       }
     } finally {
       if (mounted) {
@@ -123,11 +123,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
 
     setState(() {
-      _isSubmitting = true;
+      _isSaving = true;
+      _errorMessage = null;
     });
 
     try {
-      // Upload image if selected
       String? imageUrl;
       if (_selectedImage != null) {
         imageUrl = await _imageService.uploadProfileImage(
@@ -136,7 +136,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
       }
 
-      // Create post
       final post = await _postRepository.createPost(
         userId: _userId!,
         content: _contentController.text.trim().isNotEmpty
@@ -150,22 +149,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post créé avec succès')),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Échec de la création du post')),
-        );
+        setState(() {
+          _errorMessage = 'Échec de la création du post';
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
+        setState(() {
+          _errorMessage = 'Erreur: ${e.toString()}';
+        });
       }
     } finally {
       if (mounted) {
         setState(() {
-          _isSubmitting = false;
+          _isSaving = false;
         });
       }
     }
@@ -184,24 +183,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       appBar: AppBar(
         title: const Text('Nouveau post'),
         actions: [
-          _isSubmitting
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                )
-              : TextButton.icon(
-                  onPressed: _submitPost,
-                  icon: const Icon(Icons.send),
-                  label: const Text('Publier'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
+              ),
+            )
+          else
+            TextButton.icon(
+              onPressed: _submitPost,
+              icon: const Icon(Icons.send),
+              label: const Text('Publier'),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            ),
         ],
       ),
       body: Form(
@@ -209,7 +209,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Sport selector
+            if (_errorMessage != null)
+              Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: DropdownButtonFormField<int?>(
@@ -236,8 +256,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 },
               ),
             ),
-
-            // Post content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -252,8 +270,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ),
             ),
-
-            // Selected image preview
             if (_selectedImage != null)
               Stack(
                 children: [
@@ -292,8 +308,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                 ],
               ),
-
-            // Action buttons
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -306,33 +320,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   IconButton(
                     icon: const Icon(Icons.camera_alt),
                     onPressed: () async {
-                      try {
-                        final picker = ImagePicker();
-                        final pickedFile = await picker.pickImage(
-                          source: ImageSource.camera,
-                          maxWidth: 1200,
-                          maxHeight: 1200,
-                          imageQuality: 80,
-                        );
+                      final picker = ImagePicker();
+                      final pickedFile = await picker.pickImage(
+                        source: ImageSource.camera,
+                        maxWidth: 1200,
+                        maxHeight: 1200,
+                        imageQuality: 80,
+                      );
 
-                        if (pickedFile == null) return;
+                      if (pickedFile == null) return;
 
-                        setState(() {
-                          _selectedImage = File(pickedFile.path);
-                        });
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Erreur: ${e.toString()}')),
-                          );
-                        }
-                      }
+                      setState(() {
+                        _selectedImage = File(pickedFile.path);
+                      });
                     },
                     tooltip: 'Prendre une photo',
                   ),
                   const Spacer(),
                   ElevatedButton.icon(
-                    onPressed: _isSubmitting ? null : _submitPost,
+                    onPressed: _isSaving ? null : _submitPost,
                     icon: const Icon(Icons.send),
                     label: const Text('Publier'),
                   ),

@@ -1,4 +1,3 @@
-// lib/views/social/post_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -36,8 +35,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void initState() {
     super.initState();
     _loadData();
-
-    // Initialize timeago localization
     timeago.setLocaleMessages('fr', timeago.FrMessages());
   }
 
@@ -54,10 +51,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
 
     try {
-      // Get current user
+      // Récupérer l'utilisateur actuel
       _currentUser = await _authRepository.getCurrentUser();
 
-      // Get post data
+      // Récupérer le post
       _post = await _postRepository.getPostById(widget.postId);
       if (_post == null) {
         setState(() {
@@ -66,11 +63,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         return;
       }
 
-      // Get post author
+      // Récupérer l'auteur du post
       _postAuthor = await _userRepository.getUserProfile(_post!.userId);
 
-      // Get comments
-      await _loadComments();
+      // Récupérer les commentaires avec gestion d'erreur
+      try {
+        await _loadComments();
+      } catch (e) {
+        debugPrint('Erreur lors du chargement des commentaires: $e');
+        // Ne pas faire échouer tout le chargement en cas d'erreur sur les commentaires
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement du post: ${e.toString()}';
@@ -88,7 +90,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       _comments = await _postRepository.getComments(widget.postId);
 
-      // Load comment authors
+      // Charger les auteurs des commentaires
       for (final comment in _comments) {
         if (!_commentAuthors.containsKey(comment.userId)) {
           final author = await _userRepository.getUserProfile(comment.userId);
@@ -100,7 +102,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error loading comments: $e');
+      debugPrint('Erreur lors du chargement des commentaires: $e');
+      // Continuons sans les commentaires plutôt que de planter
     }
   }
 
@@ -181,16 +184,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             PopupMenuButton(
               itemBuilder: (context) => [
                 const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit),
-                      SizedBox(width: 8),
-                      Text('Modifier'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
@@ -202,12 +195,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
               ],
               onSelected: (value) async {
-                if (value == 'edit') {
-                  // TODO: Navigate to edit post screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fonctionnalité à venir')),
-                  );
-                } else if (value == 'delete') {
+                if (value == 'delete') {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
@@ -236,7 +224,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     );
 
                     if (success && mounted) {
-                      Navigator.pop(context, true); // Pop with refresh flag
+                      Navigator.pop(context, true); // Pop avec refresh flag
                     } else if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -254,13 +242,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
       body: Column(
         children: [
-          // Post content
+          // Contenu du post
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Post header
+                  // En-tête du post
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
@@ -299,26 +287,27 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
 
-                  // Post image if any
+                  // Image du post avec gestion d'erreur robuste
                   if (_post!.imageUrl != null)
-                    CachedNetworkImage(
-                      imageUrl: _post!.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => SizedBox(
+                    ClipRRect(
+                      child: Container(
                         height: 200,
-                        child: Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => SizedBox(
-                        height: 200,
-                        child: Center(
-                          child: Icon(Icons.error),
-                        ),
+                        child: _post!.imageUrl!.contains('ui-avatars.com')
+                            ? Center(child: Text('Image non disponible'))
+                            : CachedNetworkImage(
+                                imageUrl: _post!.imageUrl!,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Icon(Icons.error),
+                                ),
+                              ),
                       ),
                     ),
 
-                  // Post content
+                  // Contenu du post
                   if (_post!.content != null)
                     Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -330,7 +319,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   const Divider(),
 
-                  // Comments section
+                  // Section des commentaires
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
@@ -345,7 +334,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
 
-                  // Comments list
+                  // Liste des commentaires
                   if (_comments.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -456,7 +445,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
 
-          // Comment input
+          // Zone de saisie des commentaires
           if (_currentUser != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
