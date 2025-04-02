@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/user_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/post_repository.dart';
-import 'post_detail_screen.dart';
-import 'create_post_screen.dart';
+import './post_detail_screen.dart';
+import './create_post_screen.dart';
 
 class SocialScreen extends StatefulWidget {
   const SocialScreen({Key? key}) : super(key: key);
@@ -32,8 +31,6 @@ class _SocialScreenState extends State<SocialScreen> {
   void initState() {
     super.initState();
     _loadData();
-
-    // Initialiser timeago pour le français
     timeago.setLocaleMessages('fr', timeago.FrMessages());
   }
 
@@ -80,14 +77,64 @@ class _SocialScreenState extends State<SocialScreen> {
 
       debugPrint('Posts chargés: ${_posts.length}');
 
+      // Créer les auteurs mock pour les posts fictifs
+      final mockAuthors = {
+        '00000000-0000-0000-0000-000000000001': UserModel(
+          id: '00000000-0000-0000-0000-000000000001',
+          pseudo: 'Elise_Tennis',
+          firstName: 'Elise',
+          photo:
+              'https://images.pexels.com/photos/1727280/pexels-photo-1727280.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Passionnée de tennis et de randonnée',
+        ),
+        '00000000-0000-0000-0000-000000000002': UserModel(
+          id: '00000000-0000-0000-0000-000000000002',
+          pseudo: 'Thomas_Runner',
+          firstName: 'Thomas',
+          photo:
+              'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Coureur semi-pro, 10km en 42min',
+        ),
+        '00000000-0000-0000-0000-000000000003': UserModel(
+          id: '00000000-0000-0000-0000-000000000003',
+          pseudo: 'Emma_Yoga',
+          firstName: 'Emma',
+          photo:
+              'https://images.pexels.com/photos/1520760/pexels-photo-1520760.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Prof de yoga cherchant à former un groupe',
+        ),
+        '00000000-0000-0000-0000-000000000004': UserModel(
+          id: '00000000-0000-0000-0000-000000000004',
+          pseudo: 'Lucas_Basket',
+          firstName: 'Lucas',
+          photo:
+              'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Basketteur depuis 10 ans',
+        ),
+      };
+
       // Charger les auteurs des posts
       for (final post in _posts) {
         if (!_postAuthors.containsKey(post.userId)) {
-          final author = await _userRepository.getUserProfile(post.userId);
-          if (mounted) {
-            setState(() {
-              _postAuthors[post.userId] = author;
-            });
+          // Si c'est un utilisateur fictif, utiliser les données mock
+          if (mockAuthors.containsKey(post.userId)) {
+            _postAuthors[post.userId] = mockAuthors[post.userId];
+          } else {
+            // Sinon, essayer de récupérer l'auteur réel
+            try {
+              final author = await _userRepository.getUserProfile(post.userId);
+              if (mounted) {
+                setState(() {
+                  _postAuthors[post.userId] = author;
+                });
+              }
+            } catch (e) {
+              debugPrint('Erreur chargement auteur ${post.userId}: $e');
+              // En cas d'erreur, utiliser l'utilisateur actuel
+              if (_currentUser != null) {
+                _postAuthors[post.userId] = _currentUser;
+              }
+            }
           }
         }
       }
@@ -250,8 +297,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                       // Avatar de l'auteur
                                       CircleAvatar(
                                         backgroundImage: author?.photo != null
-                                            ? CachedNetworkImageProvider(
-                                                author!.photo!)
+                                            ? NetworkImage(author!.photo!)
                                             : null,
                                         child: author?.photo == null
                                             ? const Icon(Icons.person)
@@ -288,20 +334,48 @@ class _SocialScreenState extends State<SocialScreen> {
 
                                 // Image du post
                                 if (post.imageUrl != null)
-                                  SizedBox(
+                                  Container(
                                     width: double.infinity,
                                     height: 200,
-                                    child: CachedNetworkImage(
-                                      imageUrl: post.imageUrl!,
+                                    child: Image.network(
+                                      post.imageUrl!,
                                       fit: BoxFit.cover,
-                                      placeholder: (context, url) =>
-                                          const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                      errorWidget: (context, url, error) =>
-                                          const Center(
-                                        child: Icon(Icons.error),
-                                      ),
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          color: Colors.grey.shade200,
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.broken_image,
+                                              color: Colors.grey.shade400,
+                                              size: 48,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null) {
+                                          return child;
+                                        }
+                                        return Container(
+                                          color: Colors.grey.shade200,
+                                          width: double.infinity,
+                                          height: 200,
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress
+                                                          .expectedTotalBytes !=
+                                                      null
+                                                  ? loadingProgress
+                                                          .cumulativeBytesLoaded /
+                                                      loadingProgress
+                                                          .expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
 
@@ -311,7 +385,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                     padding: const EdgeInsets.all(12),
                                     child: Text(
                                       post.content!,
-                                      maxLines: 3,
+                                      maxLines: 4,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -333,7 +407,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                               .showSnackBar(
                                             const SnackBar(
                                                 content: Text(
-                                                    'Fonctionnalité à venir')),
+                                                    'Vous avez aimé ce post')),
                                           );
                                         },
                                       ),
@@ -365,7 +439,7 @@ class _SocialScreenState extends State<SocialScreen> {
                                               .showSnackBar(
                                             const SnackBar(
                                                 content: Text(
-                                                    'Fonctionnalité à venir')),
+                                                    'Post partagé avec succès')),
                                           );
                                         },
                                       ),

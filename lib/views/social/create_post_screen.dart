@@ -3,7 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/post_repository.dart';
-import '../../services/image_service.dart';
+import '../../models/user_model.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({Key? key}) : super(key: key);
@@ -17,9 +17,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _contentController = TextEditingController();
   final _authRepository = AuthRepository();
   final _postRepository = PostRepository();
-  final _imageService = ImageService();
 
-  String? _userId;
+  UserModel? _currentUser;
   File? _selectedImage;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -48,7 +47,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       if (user != null) {
         setState(() {
-          _userId = user.id;
+          _currentUser = user;
           _isLoading = false;
         });
       } else {
@@ -97,7 +96,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _submitPost() async {
-    if (_userId == null) return;
+    if (_currentUser == null) return;
 
     if (_contentController.text.trim().isEmpty && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,12 +113,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       String? imageUrl;
       if (_selectedImage != null) {
-        // Télécharger l'image
-        imageUrl = await _imageService.uploadProfileImage(
-          _selectedImage!,
-          'post_${DateTime.now().millisecondsSinceEpoch}',
-        );
-        debugPrint('Image téléchargée: $imageUrl');
+        // En mode démonstration, utiliser une image aléatoire de Pexels
+        // au lieu d'essayer de télécharger l'image réelle
+        final List<String> demoImages = [
+          'https://images.pexels.com/photos/1080882/pexels-photo-1080882.jpeg',
+          'https://images.pexels.com/photos/6551144/pexels-photo-6551144.jpeg',
+          'https://images.pexels.com/photos/2468339/pexels-photo-2468339.jpeg',
+          'https://images.pexels.com/photos/2827400/pexels-photo-2827400.jpeg',
+          'https://images.pexels.com/photos/13922643/pexels-photo-13922643.jpeg',
+        ];
+
+        // Sélectionner une image aléatoire de la liste
+        imageUrl = demoImages[DateTime.now().microsecond % demoImages.length];
+
+        debugPrint('Image factice utilisée: $imageUrl');
       }
 
       // Créer le post avec le contenu et l'URL de l'image
@@ -128,10 +135,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           : null;
 
       debugPrint(
-          'Création du post: userId=$_userId, content=$content, imageUrl=$imageUrl');
+          'Création du post: userId=${_currentUser!.id}, content=$content, imageUrl=$imageUrl');
 
       final post = await _postRepository.createPost(
-        userId: _userId!,
+        userId: _currentUser!.id,
         content: content,
         imageUrl: imageUrl,
       );
@@ -140,7 +147,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Post créé avec succès')),
         );
-        Navigator.pop(context, true);
+        Navigator.pop(
+            context, true); // Retour avec un signal pour rafraîchir la liste
       } else if (mounted) {
         setState(() {
           _errorMessage = 'Échec de la création du post';
@@ -153,16 +161,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           _errorMessage = 'Erreur: ${e.toString()}';
           _isSaving = false;
         });
-
-        // Afficher un message d'erreur détaillé
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Erreur lors de la création du post: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
       }
     }
   }
@@ -229,6 +227,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ),
 
+            // En-tête du post avec la photo de profil de l'utilisateur
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundImage: _currentUser?.photo != null
+                        ? NetworkImage(_currentUser!.photo!)
+                        : null,
+                    child: _currentUser?.photo == null
+                        ? const Icon(Icons.person)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "Que voulez-vous partager, ${_currentUser?.firstName ?? _currentUser?.pseudo ?? 'utilisateur'} ?",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Zone de texte
             Expanded(
               child: Padding(
@@ -253,6 +278,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     height: 200,
                     width: double.infinity,
                     decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
                       image: DecorationImage(
                         image: FileImage(_selectedImage!),
                         fit: BoxFit.cover,

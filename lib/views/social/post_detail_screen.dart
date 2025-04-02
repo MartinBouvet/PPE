@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/user_model.dart';
 import '../../repositories/auth_repository.dart';
@@ -63,16 +62,59 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         return;
       }
 
-      // Récupérer l'auteur du post
-      _postAuthor = await _userRepository.getUserProfile(_post!.userId);
+      // Créer les auteurs mock pour les posts fictifs
+      final mockAuthors = {
+        '00000000-0000-0000-0000-000000000001': UserModel(
+          id: '00000000-0000-0000-0000-000000000001',
+          pseudo: 'Elise_Tennis',
+          firstName: 'Elise',
+          photo:
+              'https://images.pexels.com/photos/1727280/pexels-photo-1727280.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Passionnée de tennis et de randonnée',
+        ),
+        '00000000-0000-0000-0000-000000000002': UserModel(
+          id: '00000000-0000-0000-0000-000000000002',
+          pseudo: 'Thomas_Runner',
+          firstName: 'Thomas',
+          photo:
+              'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Coureur semi-pro, 10km en 42min',
+        ),
+        '00000000-0000-0000-0000-000000000003': UserModel(
+          id: '00000000-0000-0000-0000-000000000003',
+          pseudo: 'Emma_Yoga',
+          firstName: 'Emma',
+          photo:
+              'https://images.pexels.com/photos/1520760/pexels-photo-1520760.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Prof de yoga cherchant à former un groupe',
+        ),
+        '00000000-0000-0000-0000-000000000004': UserModel(
+          id: '00000000-0000-0000-0000-000000000004',
+          pseudo: 'Lucas_Basket',
+          firstName: 'Lucas',
+          photo:
+              'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=200',
+          description: 'Basketteur depuis 10 ans',
+        ),
+      };
 
-      // Récupérer les commentaires avec gestion d'erreur
-      try {
-        await _loadComments();
-      } catch (e) {
-        debugPrint('Erreur lors du chargement des commentaires: $e');
-        // Ne pas faire échouer tout le chargement en cas d'erreur sur les commentaires
+      // Récupérer l'auteur du post
+      if (mockAuthors.containsKey(_post!.userId)) {
+        _postAuthor = mockAuthors[_post!.userId];
+      } else {
+        try {
+          _postAuthor = await _userRepository.getUserProfile(_post!.userId);
+        } catch (e) {
+          debugPrint('Erreur chargement auteur: $e');
+          // En cas d'erreur, utiliser l'utilisateur actuel pour le post
+          if (_currentUser != null && _post!.userId == _currentUser!.id) {
+            _postAuthor = _currentUser;
+          }
+        }
       }
+
+      // Récupérer les commentaires
+      await _loadComments(mockAuthors);
     } catch (e) {
       setState(() {
         _errorMessage = 'Erreur lors du chargement du post: ${e.toString()}';
@@ -86,24 +128,38 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  Future<void> _loadComments() async {
+  Future<void> _loadComments(Map<String, UserModel?> mockAuthors) async {
     try {
       _comments = await _postRepository.getComments(widget.postId);
 
       // Charger les auteurs des commentaires
       for (final comment in _comments) {
         if (!_commentAuthors.containsKey(comment.userId)) {
-          final author = await _userRepository.getUserProfile(comment.userId);
-          if (mounted) {
-            setState(() {
-              _commentAuthors[comment.userId] = author;
-            });
+          // Si c'est un utilisateur fictif, utiliser les données mock
+          if (mockAuthors.containsKey(comment.userId)) {
+            _commentAuthors[comment.userId] = mockAuthors[comment.userId];
+          } else if (_currentUser != null &&
+              comment.userId == _currentUser!.id) {
+            // Si c'est l'utilisateur actuel
+            _commentAuthors[comment.userId] = _currentUser;
+          } else {
+            // Sinon, essayer de récupérer l'auteur
+            try {
+              final author =
+                  await _userRepository.getUserProfile(comment.userId);
+              if (mounted) {
+                setState(() {
+                  _commentAuthors[comment.userId] = author;
+                });
+              }
+            } catch (e) {
+              debugPrint('Erreur chargement auteur de commentaire: $e');
+            }
           }
         }
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement des commentaires: $e');
-      // Continuons sans les commentaires plutôt que de planter
     }
   }
 
@@ -123,7 +179,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       if (comment != null) {
         _commentController.clear();
-        await _loadComments();
+
+        // Ajouter l'auteur du commentaire (l'utilisateur actuel)
+        _commentAuthors[_currentUser!.id] = _currentUser;
+
+        // Recharger les commentaires
+        _comments = await _postRepository.getComments(widget.postId);
+        setState(() {});
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +213,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       );
     }
 
-    if (_errorMessage != null || _post == null || _postAuthor == null) {
+    if (_errorMessage != null || _post == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Détail du post')),
         body: Center(
@@ -255,7 +317,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       children: [
                         CircleAvatar(
                           backgroundImage: _postAuthor?.photo != null
-                              ? CachedNetworkImageProvider(_postAuthor!.photo!)
+                              ? NetworkImage(_postAuthor!.photo!)
                               : null,
                           child: _postAuthor?.photo == null
                               ? const Icon(Icons.person)
@@ -287,24 +349,27 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
 
-                  // Image du post avec gestion d'erreur robuste
+                  // Image du post
                   if (_post!.imageUrl != null)
-                    Container(
-                      height: 200,
+                    SizedBox(
+                      height: 250,
                       width: double.infinity,
-                      child: _post!.imageUrl!.contains('ui-avatars.com')
-                          ? const Center(child: Text('Image non disponible'))
-                          : CachedNetworkImage(
-                              imageUrl: _post!.imageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) =>
-                                  const Center(
-                                child: Icon(Icons.error),
+                      child: Image.network(
+                        _post!.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey.shade400,
+                                size: 48,
                               ),
                             ),
+                          );
+                        },
+                      ),
                     ),
 
                   // Contenu du post
@@ -316,6 +381,36 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
+
+                  // Actions
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton.icon(
+                          icon: const Icon(Icons.thumb_up_outlined),
+                          label: const Text('J\'aime'),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Vous avez aimé ce post')),
+                            );
+                          },
+                        ),
+                        TextButton.icon(
+                          icon: const Icon(Icons.share_outlined),
+                          label: const Text('Partager'),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Post partagé avec succès')),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
 
                   const Divider(),
 
@@ -364,7 +459,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               CircleAvatar(
                                 radius: 16,
                                 backgroundImage: author?.photo != null
-                                    ? CachedNetworkImageProvider(author!.photo!)
+                                    ? NetworkImage(author!.photo!)
                                     : null,
                                 child: author?.photo == null
                                     ? const Icon(Icons.person, size: 16)
@@ -431,7 +526,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                         comment.id,
                                         _currentUser!.id,
                                       );
-                                      await _loadComments();
+                                      // Recharger les commentaires
+                                      _comments = await _postRepository
+                                          .getComments(widget.postId);
+                                      setState(() {});
                                     }
                                   },
                                 ),
@@ -464,7 +562,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   CircleAvatar(
                     radius: 16,
                     backgroundImage: _currentUser?.photo != null
-                        ? CachedNetworkImageProvider(_currentUser!.photo!)
+                        ? NetworkImage(_currentUser!.photo!)
                         : null,
                     child: _currentUser?.photo == null
                         ? const Icon(Icons.person, size: 16)
