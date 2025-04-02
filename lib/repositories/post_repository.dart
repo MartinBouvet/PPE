@@ -92,7 +92,7 @@ class PostRepository {
   final _supabase = SupabaseConfig.client;
   static final _uuid = Uuid();
 
-  // Stockage local des posts pour les démonstrations
+  // Stockage local des posts pour les démonstrations avec des images sportives
   static final List<PostModel> _localPosts = [
     PostModel(
       id: '1',
@@ -100,7 +100,7 @@ class PostRepository {
       content:
           'Je recherche des partenaires pour jouer au tennis ce weekend au club du 15ème. Qui est partant ?',
       imageUrl:
-          'https://images.pexels.com/photos/5730758/pexels-photo-5730758.jpeg',
+          'https://images.pexels.com/photos/8224716/pexels-photo-8224716.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       createdAt: DateTime.now().subtract(const Duration(days: 2)),
       status: 'published',
     ),
@@ -110,7 +110,7 @@ class PostRepository {
       content:
           'Superbe session de course à pied ce matin ! 10km en 42 minutes, nouveau record personnel 🏃‍♂️',
       imageUrl:
-          'https://images.pexels.com/photos/5067188/pexels-photo-5067188.jpeg',
+          'https://images.pexels.com/photos/2526878/pexels-photo-2526878.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       createdAt: DateTime.now().subtract(const Duration(hours: 8)),
       status: 'published',
     ),
@@ -120,7 +120,7 @@ class PostRepository {
       content:
           'Cours de yoga en plein air demain à 10h au parc Montsouris. Places limitées, envoyez-moi un message si vous êtes intéressés.',
       imageUrl:
-          'https://images.pexels.com/photos/8436661/pexels-photo-8436661.jpeg',
+          'https://images.pexels.com/photos/4056723/pexels-photo-4056723.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       status: 'published',
     ),
@@ -164,6 +164,101 @@ class PostRepository {
       ),
     ],
   };
+
+  // Images par sport pour les posts
+  final Map<String, List<String>> _sportImages = {
+    'tennis': [
+      'https://images.pexels.com/photos/8224716/pexels-photo-8224716.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/2304369/pexels-photo-2304369.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/8985506/pexels-photo-8985506.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'running': [
+      'https://images.pexels.com/photos/2526878/pexels-photo-2526878.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/7188638/pexels-photo-7188638.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/6552557/pexels-photo-6552557.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'yoga': [
+      'https://images.pexels.com/photos/4056723/pexels-photo-4056723.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/3823039/pexels-photo-3823039.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/775417/pexels-photo-775417.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'basketball': [
+      'https://images.pexels.com/photos/1080882/pexels-photo-1080882.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/2820902/pexels-photo-2820902.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/2362255/pexels-photo-2362255.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'football': [
+      'https://images.pexels.com/photos/3148452/pexels-photo-3148452.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/918798/pexels-photo-918798.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/47730/the-ball-stadion-football-the-pitch-47730.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'swimming': [
+      'https://images.pexels.com/photos/260598/pexels-photo-260598.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/61225/pexels-photo-61225.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/73760/swimming-swimmer-female-race-73760.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'boxing': [
+      'https://images.pexels.com/photos/4804077/pexels-photo-4804077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/9568970/pexels-photo-9568970.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/4761779/pexels-photo-4761779.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'fitness': [
+      'https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/38630/bodybuilder-weight-training-stress-38630.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/2468339/pexels-photo-2468339.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'climbing': [
+      'https://images.pexels.com/photos/8329499/pexels-photo-8329499.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/7291709/pexels-photo-7291709.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/1822458/pexels-photo-1822458.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'cycling': [
+      'https://images.pexels.com/photos/5077067/pexels-photo-5077067.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/5462562/pexels-photo-5462562.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/163491/bike-mountain-mountain-biking-trail-163491.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+    'default': [
+      'https://images.pexels.com/photos/3621104/pexels-photo-3621104.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/3927385/pexels-photo-3927385.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+      'https://images.pexels.com/photos/260409/pexels-photo-260409.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    ],
+  };
+
+  String _getRandomSportImage(String? sportKeyword) {
+    String sportType = 'default';
+
+    if (sportKeyword != null) {
+      final sportText = sportKeyword.toLowerCase();
+
+      if (sportText.contains('tennis')) {
+        sportType = 'tennis';
+      } else if (sportText.contains('basket') || sportText.contains('ball')) {
+        sportType = 'basketball';
+      } else if (sportText.contains('foot') || sportText.contains('soccer')) {
+        sportType = 'football';
+      } else if (sportText.contains('run') || sportText.contains('cours')) {
+        sportType = 'running';
+      } else if (sportText.contains('yoga')) {
+        sportType = 'yoga';
+      } else if (sportText.contains('box') || sportText.contains('ring')) {
+        sportType = 'boxing';
+      } else if (sportText.contains('climb') ||
+          sportText.contains('escalade')) {
+        sportType = 'climbing';
+      } else if (sportText.contains('swim') || sportText.contains('nage')) {
+        sportType = 'swimming';
+      } else if (sportText.contains('fitness') || sportText.contains('gym')) {
+        sportType = 'fitness';
+      } else if (sportText.contains('velo') ||
+          sportText.contains('cycling') ||
+          sportText.contains('bike')) {
+        sportType = 'cycling';
+      }
+    }
+
+    final sportImagesList = _sportImages[sportType] ?? _sportImages['default']!;
+    return sportImagesList[DateTime.now().microsecond % sportImagesList.length];
+  }
 
   Future<List<PostModel>> getPosts({
     String? userId,
@@ -254,13 +349,16 @@ class PostRepository {
         debugPrint('Erreur Supabase, création en local: $e');
       }
 
+      // Sélectionner une image en rapport avec le contenu sportif
+      final sportImage = _getRandomSportImage(content);
+
       // Créer le post localement
       final now = DateTime.now();
       final newPost = PostModel(
         id: _uuid.v4(),
         userId: userId,
         content: content,
-        imageUrl: imageUrl,
+        imageUrl: sportImage,
         createdAt: now,
         status: 'published',
       );
@@ -273,12 +371,13 @@ class PostRepository {
 
       // Même en cas d'erreur, créer un post local pour la démo
       try {
+        final sportImage = _getRandomSportImage(content);
         final now = DateTime.now();
         final newPost = PostModel(
           id: _uuid.v4(),
           userId: userId,
           content: content,
-          imageUrl: imageUrl,
+          imageUrl: sportImage,
           createdAt: now,
           status: 'published',
         );
@@ -322,11 +421,19 @@ class PostRepository {
           .indexWhere((post) => post.id == postId && post.userId == userId);
       if (index != -1) {
         final oldPost = _localPosts[index];
+
+        // Si le contenu est modifié et qu'il n'y a pas d'image spécifiée,
+        // on peut choisir une nouvelle image en rapport avec le contenu
+        String? newImageUrl = imageUrl;
+        if (content != null && imageUrl == null) {
+          newImageUrl = _getRandomSportImage(content);
+        }
+
         _localPosts[index] = PostModel(
           id: oldPost.id,
           userId: oldPost.userId,
           content: content ?? oldPost.content,
-          imageUrl: imageUrl ?? oldPost.imageUrl,
+          imageUrl: newImageUrl ?? oldPost.imageUrl,
           createdAt: oldPost.createdAt,
           status: oldPost.status,
         );

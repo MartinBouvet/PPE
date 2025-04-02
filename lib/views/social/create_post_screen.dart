@@ -23,76 +23,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _errorMessage;
+  String? _selectedSport;
+
+  final List<String> _sportOptions = [
+    'Tennis',
+    'Basketball',
+    'Football',
+    'Running',
+    'Yoga',
+    'Natation',
+    'Fitness',
+    'Escalade',
+    'Cyclisme',
+    'Boxe',
+    'Autre'
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final user = await _authRepository.getCurrentUser();
-
-      if (user != null) {
-        setState(() {
-          _currentUser = user;
-          _isLoading = false;
-        });
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Vous devez être connecté pour créer un post')),
-          );
-          Navigator.pop(context);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Erreur: ${e.toString()}';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 80,
-      );
-
-      if (pickedFile == null) return;
-
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Erreur lors de la sélection de l\'image: ${e.toString()}')),
-        );
-      }
-    }
   }
 
   Future<void> _submitPost() async {
@@ -113,33 +63,28 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       String? imageUrl;
       if (_selectedImage != null) {
-        // En mode démonstration, utiliser une image aléatoire de Pexels
-        // au lieu d'essayer de télécharger l'image réelle
-        final List<String> demoImages = [
-          'https://images.pexels.com/photos/1080882/pexels-photo-1080882.jpeg',
-          'https://images.pexels.com/photos/6551144/pexels-photo-6551144.jpeg',
-          'https://images.pexels.com/photos/2468339/pexels-photo-2468339.jpeg',
-          'https://images.pexels.com/photos/2827400/pexels-photo-2827400.jpeg',
-          'https://images.pexels.com/photos/13922643/pexels-photo-13922643.jpeg',
-        ];
-
-        // Sélectionner une image aléatoire de la liste
-        imageUrl = demoImages[DateTime.now().microsecond % demoImages.length];
-
-        debugPrint('Image factice utilisée: $imageUrl');
+        // En mode démonstration, l'image sera gérée par le repository qui choisira
+        // une image sportive appropriée basée sur le contenu et le sport sélectionné
+        imageUrl = null; // Le repository s'en charge
       }
 
-      // Créer le post avec le contenu et l'URL de l'image
-      final content = _contentController.text.trim().isNotEmpty
-          ? _contentController.text.trim()
-          : null;
+      // Ajouter le sport sélectionné au contenu du post pour permettre au repository
+      // de choisir une image appropriée
+      String content = _contentController.text.trim();
+      if (_selectedSport != null && _selectedSport != 'Autre') {
+        if (content.isNotEmpty) {
+          content += "\n\n#$_selectedSport";
+        } else {
+          content = "#$_selectedSport";
+        }
+      }
 
       debugPrint(
-          'Création du post: userId=${_currentUser!.id}, content=$content, imageUrl=$imageUrl');
+          'Création du post: userId=${_currentUser!.id}, content=$content');
 
       final post = await _postRepository.createPost(
         userId: _currentUser!.id,
-        content: content,
+        content: content.isEmpty ? null : content,
         imageUrl: imageUrl,
       );
 
@@ -254,6 +199,35 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
             ),
 
+            // Sélecteur de sport
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Sport concerné',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: const Icon(Icons.sports),
+                ),
+                value: _selectedSport,
+                hint: const Text('Sélectionnez un sport'),
+                items: _sportOptions.map((String sport) {
+                  return DropdownMenuItem<String>(
+                    value: sport,
+                    child: Text(sport),
+                  );
+                }).toList(),
+                onChanged: (String? value) {
+                  setState(() {
+                    _selectedSport = value;
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
             // Zone de texte
             Expanded(
               child: Padding(
@@ -311,6 +285,34 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ],
               ),
 
+            // Information sur les photos
+            if (_selectedImage == null)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade100),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade800),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Choisissez un sport pour que votre publication soit illustrée par une image en rapport avec celui-ci.",
+                          style: TextStyle(
+                              color: Colors.blue.shade800, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Barre d'actions
             Padding(
               padding: const EdgeInsets.all(16),
@@ -356,5 +358,70 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await _authRepository.getCurrentUser();
+
+      if (user != null) {
+        setState(() {
+          _currentUser = user;
+          _isLoading = false;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Vous devez être connecté pour créer un post')),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erreur: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Erreur lors de la sélection de l\'image: ${e.toString()}')),
+        );
+      }
+    }
   }
 }
