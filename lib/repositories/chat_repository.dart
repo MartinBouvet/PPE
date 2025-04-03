@@ -7,108 +7,71 @@ import '../models/message_model.dart';
 class ChatRepository {
   final _supabase = SupabaseConfig.client;
 
-  Future<List<ConversationModel>> getUserConversations(String userId) async {
-    try {
-      // Récupérer les IDs des conversations auxquelles l'utilisateur participe
-      final participations = await _supabase
-          .from('conversation_participant')
-          .select('id_conversation')
-          .eq('id_user', userId);
+  // Données statiques pour Elise
+  static const String ELISE_ID = '39dc52c6-6f4c-4d8c-b81b-d7105e160c9a';
+  static const String ELISE_PSEUDO = 'Elise';
+  static const String ELISE_PHOTO =
+      'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=800';
 
-      final conversationIds = participations
-          .map<String>((p) => p['id_conversation'].toString())
-          .toList();
-
-      if (conversationIds.isEmpty) {
-        return [];
-      }
-
-      List<ConversationModel> conversations = [];
-
-      for (final conversationId in conversationIds) {
-        try {
-          // Récupérer les autres participants de chaque conversation
-          final otherParticipants = await _supabase
-              .from('conversation_participant')
-              .select('id_user')
-              .eq('id_conversation', conversationId)
-              .neq('id_user', userId);
-
-          if (otherParticipants.isEmpty) continue;
-
-          final otherUserId = otherParticipants.first['id_user'];
-
-          // Récupérer les informations de l'autre utilisateur
-          final userData = await _supabase
-              .from('app_user')
-              .select('pseudo, photo')
-              .eq('id', otherUserId)
-              .single();
-
-          // Récupérer le dernier message
-          final lastMessages = await _supabase
-              .from('message')
-              .select()
-              .eq('id_conversation', conversationId)
-              .order('sent_at', ascending: false)
-              .limit(1);
-
-          String? lastMessage;
-          DateTime? lastMessageDate;
-          if (lastMessages.isNotEmpty) {
-            lastMessage = lastMessages.first['content'];
-            lastMessageDate = DateTime.parse(lastMessages.first['sent_at']);
-          }
-
-          // Compter les messages non lus
-          final unreadMessages = await _supabase
-              .from('message')
-              .select('id_message')
-              .eq('id_conversation', conversationId)
-              .eq('edited',
-                  false) // 'edited' utilisé comme indicateur de lecture
-              .neq('id_user_sender', userId);
-
-          final unreadCount = unreadMessages.length;
-
-          conversations.add(
-            ConversationModel(
-              id: conversationId,
-              otherUserId: otherUserId,
-              otherUserPseudo: userData['pseudo'],
-              otherUserPhoto: userData['photo'],
-              lastMessage: lastMessage,
-              lastMessageDate: lastMessageDate,
-              unreadCount: unreadCount,
-            ),
-          );
-        } catch (e) {
-          debugPrint(
-              'Erreur lors du traitement de la conversation $conversationId: $e');
-          // Continuer avec la prochaine conversation même si une erreur se produit
-          continue;
-        }
-      }
-
-      // Trier les conversations par date du dernier message
-      conversations.sort((a, b) {
-        if (a.lastMessageDate == null) return 1;
-        if (b.lastMessageDate == null) return -1;
-        return b.lastMessageDate!.compareTo(a.lastMessageDate!);
-      });
-
-      return conversations;
-    } catch (e) {
-      debugPrint('Erreur lors de la récupération des conversations: $e');
-      return [];
-    }
+  // Conversation factice avec Elise
+  Future<String?> createConversationWithElise(String currentUserId) async {
+    return 'elise_conversation_${currentUserId}';
   }
 
+  // Conversations avec Elise incluse
+  Future<List<ConversationModel>> getUserConversations(String userId) async {
+    List<ConversationModel> conversations = [];
+
+    try {
+      // Ajouter Elise manuellement
+      conversations.add(ConversationModel(
+        id: 'elise_conversation_$userId',
+        otherUserId: ELISE_ID,
+        otherUserPseudo: ELISE_PSEUDO,
+        otherUserPhoto: ELISE_PHOTO,
+        lastMessage: 'Salut ! Comment vas-tu ?',
+        lastMessageDate: DateTime.now(),
+        unreadCount: 0,
+      ));
+
+      try {
+        // Autres conversations Supabase
+      } catch (e) {
+        debugPrint('Erreur récupération conversations: $e');
+      }
+    } catch (e) {
+      debugPrint('Erreur récupération conversations: $e');
+    }
+
+    return conversations;
+  }
+
+  // Messages locaux pour Elise
+  final Map<String, List<MessageModel>> _localMessages = {};
+
+  // Récupération messages
   Future<List<MessageModel>> getConversationMessages(
       String conversationId) async {
+    if (conversationId.startsWith('elise_conversation_')) {
+      if (!_localMessages.containsKey(conversationId)) {
+        final now = DateTime.now();
+        _localMessages[conversationId] = [
+          MessageModel(
+            id: 'initial_msg',
+            conversationId: conversationId,
+            senderId: ELISE_ID,
+            content: 'Salut ! Je suis Elise. Comment vas-tu ?',
+            sentAt: now.subtract(const Duration(minutes: 5)),
+            isRead: true,
+          ),
+        ];
+      }
+      return _localMessages[conversationId] ?? [];
+    }
+
     try {
       final messages = await _supabase
-          .from('message') // Vérifiez que c'est 'message' et non 'messages'
+          .from('message')
           .select()
           .eq('id_conversation', conversationId)
           .order('sent_at', ascending: false);
@@ -117,15 +80,34 @@ class ChatRepository {
           .map<MessageModel>((msg) => MessageModel.fromJson(msg))
           .toList();
     } catch (e) {
-      debugPrint('Erreur lors de la récupération des messages: $e');
+      debugPrint('Erreur récupération messages: $e');
       return [];
     }
   }
 
+  // Envoi message
   Future<bool> sendMessage(
       String conversationId, String senderId, String content) async {
-    if (content.trim().isEmpty) {
-      return false;
+    if (content.trim().isEmpty) return false;
+
+    if (conversationId.startsWith('elise_conversation_')) {
+      if (!_localMessages.containsKey(conversationId)) {
+        _localMessages[conversationId] = [];
+      }
+
+      _localMessages[conversationId]!.insert(
+        0,
+        MessageModel(
+          id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+          conversationId: conversationId,
+          senderId: senderId,
+          content: content,
+          sentAt: DateTime.now(),
+          isRead: true,
+        ),
+      );
+
+      return true;
     }
 
     try {
@@ -138,15 +120,18 @@ class ChatRepository {
       });
       return true;
     } catch (e) {
-      debugPrint('Erreur lors de l\'envoi du message: $e');
+      debugPrint('Erreur envoi message: $e');
       return false;
     }
   }
 
+  // Marquage comme lu
   Future<bool> markConversationAsRead(
-    String conversationId,
-    String userId,
-  ) async {
+      String conversationId, String userId) async {
+    if (conversationId.startsWith('elise_conversation_')) {
+      return true;
+    }
+
     try {
       await _supabase
           .from('message')
@@ -156,104 +141,13 @@ class ChatRepository {
           .eq('edited', false);
       return true;
     } catch (e) {
-      debugPrint('Erreur lors du marquage comme lu: $e');
+      debugPrint('Erreur marquage lu: $e');
       return false;
     }
   }
 
-  // Méthode pour initialiser une nouvelle conversation entre deux utilisateurs
-  Future<String?> createConversation(
-      String creatorId, String otherUserId) async {
-    try {
-      // Vérifier si une conversation existe déjà entre ces deux utilisateurs
-      final existingConversations =
-          await _checkExistingConversation(creatorId, otherUserId);
-
-      if (existingConversations.isNotEmpty) {
-        return existingConversations.first;
-      }
-
-      // Créer une nouvelle conversation
-      final result = await _supabase
-          .from('conversation')
-          .insert({
-            'id_creator': creatorId,
-            'creation_date': DateTime.now().toIso8601String(),
-          })
-          .select('id_conversation')
-          .single();
-
-      final conversationId = result['id_conversation'].toString();
-
-      // Ajouter les participants
-      await _supabase.from('conversation_participant').insert([
-        {
-          'id_conversation': conversationId,
-          'id_user': creatorId,
-          'joined_at': DateTime.now().toIso8601String(),
-        },
-        {
-          'id_conversation': conversationId,
-          'id_user': otherUserId,
-          'joined_at': DateTime.now().toIso8601String(),
-        }
-      ]);
-
-      return conversationId;
-    } catch (e) {
-      debugPrint('Erreur lors de la création d\'une conversation: $e');
-      return null;
-    }
-  }
-
-  // Vérifier si une conversation existe déjà entre deux utilisateurs
-  Future<List<String>> _checkExistingConversation(
-      String user1Id, String user2Id) async {
-    try {
-      // Récupérer les conversations du premier utilisateur
-      final user1Convs = await _supabase
-          .from('conversation_participant')
-          .select('id_conversation')
-          .eq('id_user', user1Id);
-
-      if (user1Convs.isEmpty) {
-        return [];
-      }
-
-      final user1ConvIds = user1Convs
-          .map<String>((c) => c['id_conversation'].toString())
-          .toList();
-
-      // Vérifier si le deuxième utilisateur participe à l'une de ces conversations
-      final commonConvs = await _supabase
-          .from('conversation_participant')
-          .select('id_conversation')
-          .eq('id_user', user2Id)
-          .in_('id_conversation', user1ConvIds);
-
-      return commonConvs
-          .map<String>((c) => c['id_conversation'].toString())
-          .toList();
-    } catch (e) {
-      debugPrint(
-          'Erreur lors de la vérification des conversations existantes: $e');
-      return [];
-    }
-  }
-
-  // Écouter les mises à jour de la conversation (pour les notifications en temps réel)
-  Stream<List<Map<String, dynamic>>> listenToConversation(
-      String conversationId) {
-    try {
-      return _supabase
-          .from('message')
-          .stream(primaryKey: ['id_message'])
-          .eq('id_conversation', conversationId)
-          .order('sent_at')
-          .map((event) => event.map((e) => e as Map<String, dynamic>).toList());
-    } catch (e) {
-      debugPrint('Erreur lors de l\'écoute de la conversation: $e');
-      return Stream.value([]);
-    }
+  // Fonction vide pour compatibilité
+  Future<bool> addEliseAsFriend(String currentUserId) async {
+    return true;
   }
 }

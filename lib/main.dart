@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,36 +6,40 @@ import 'config/theme.dart';
 import 'config/supabase_config.dart';
 import 'services/connectivity_service.dart';
 import 'utils/db_initializer.dart';
+import 'services/elise_service.dart';
 
 void main() async {
-  // Assurez-vous que tout est initialisé correctement
+  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // Chargement des variables d'environnement
+    // Load environment variables
     await dotenv.load(fileName: ".env").catchError((e) {
-      debugPrint(
-          'Erreur de chargement du fichier .env: $e. Utilisation des valeurs par défaut.');
+      debugPrint('Error loading .env file: $e. Using default values.');
     });
 
-    // Initialisation des services
+    // Initialize services
     final connectivityService = ConnectivityService();
     await connectivityService.initialize();
 
-    // Initialisation de Supabase
+    // Initialize Supabase
     await SupabaseConfig.initialize();
 
-    // Vérification de la structure de la base de données
+    // Check database structure
     final dbStructureOk = await DbInitializer.checkDatabaseStructure();
     if (dbStructureOk) {
-      // Initialisation des données de base si nécessaire
+      // Initialize basic data if needed
       await DbInitializer.initializeBasicData();
     }
 
+    // Initialize Elise contact
+    final eliseService = EliseService();
+    await eliseService.initializeEliseContact();
+
     runApp(const MyApp());
   } catch (e) {
-    debugPrint('Erreur lors de l\'initialisation: $e');
-    // Afficher une UI d'erreur appropriée
+    debugPrint('Error during initialization: $e');
+    // Show appropriate error UI
     runApp(ErrorApp(error: e.toString()));
   }
 }
@@ -51,11 +54,11 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       routerConfig: AppRouter.router,
       debugShowCheckedModeBanner: false,
-      // Écran de chargement
+      // Loading screen
       builder: (context, child) {
         return child ?? const Center(child: CircularProgressIndicator());
       },
-      // Localisation pour les formats de date, etc.
+      // Localization for date formats, etc.
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -65,13 +68,12 @@ class MyApp extends StatelessWidget {
         Locale('fr', 'FR'),
         Locale('en', 'US'),
       ],
-      locale: const Locale(
-          'fr', 'FR'), // Définir le français comme langue par défaut
+      locale: const Locale('fr', 'FR'), // Set French as default language
     );
   }
 }
 
-// Application à afficher en cas d'erreur critique
+// Application to display in case of critical error
 class ErrorApp extends StatelessWidget {
   final String error;
 
@@ -80,7 +82,7 @@ class ErrorApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Erreur AKOS',
+      title: 'AKOS Error',
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
@@ -104,7 +106,7 @@ class ErrorApp extends StatelessWidget {
                 const Icon(Icons.error_outline, size: 80, color: Colors.red),
                 const SizedBox(height: 20),
                 const Text(
-                  'Une erreur est survenue lors du démarrage',
+                  'An error occurred during startup',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
@@ -117,10 +119,10 @@ class ErrorApp extends StatelessWidget {
                 const SizedBox(height: 30),
                 ElevatedButton(
                   onPressed: () {
-                    // Tenter de redémarrer l'application
+                    // Try to restart the application
                     main();
                   },
-                  child: const Text('Réessayer'),
+                  child: const Text('Retry'),
                 ),
               ],
             ),
