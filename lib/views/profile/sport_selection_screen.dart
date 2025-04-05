@@ -48,23 +48,18 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
       if (user != null) {
         _userId = user.id;
 
-        // Charger tous les sports disponibles
         _allSports = await _sportUserRepository.getAllSports();
 
         setState(() {
-          // Pré-sélectionner certains sports pour la démo
           _selectedSports = _allSports
               .where((sport) => sport.id == 11 || sport.id == 9)
               .toList();
 
-          // Définir les niveaux et préférences
           for (var sport in _selectedSports) {
             if (sport.id == 11) {
-              // Padel
               _skillLevels[sport.id] = 'Intermédiaire';
               _lookingForPartners[sport.id] = true;
             } else if (sport.id == 9) {
-              // Course à pied
               _skillLevels[sport.id] = 'Avancé';
               _lookingForPartners[sport.id] = true;
             }
@@ -95,8 +90,7 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
     });
 
     try {
-      await Future.delayed(
-          const Duration(milliseconds: 500)); // Simuler un délai réseau
+      await Future.delayed(const Duration(milliseconds: 500));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -257,7 +251,6 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
       ),
       body: Column(
         children: [
-          // En-tête avec instructions
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -275,8 +268,6 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
               ],
             ),
           ),
-
-          // Sports sélectionnés
           if (_selectedSports.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -325,12 +316,14 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
                           ),
                           avatar: CircleAvatar(
                             backgroundColor: Colors.transparent,
-                            child: Icon(
-                              Icons.sports,
-                              size: 16,
-                              color: _lookingForPartners[sport.id] == true
-                                  ? Colors.green.shade800
-                                  : Colors.blue.shade800,
+                            child: Text(
+                              sport.name[0],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: _lookingForPartners[sport.id] == true
+                                    ? Colors.green.shade800
+                                    : Colors.blue.shade800,
+                              ),
                             ),
                           ),
                         ),
@@ -340,8 +333,6 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
                 ],
               ),
             ),
-
-          // Liste des sports disponibles
           Expanded(
             child: ListView.builder(
               itemCount: _allSports.length,
@@ -367,28 +358,13 @@ class _SportSelectionScreenState extends State<SportSelectionScreen> {
                     backgroundColor: isSelected
                         ? Theme.of(context).primaryColor
                         : Colors.grey.shade200,
-                    child: sport.logo != null
-                        ? ClipOval(
-                            child: Image.network(
-                              sport.logo!,
-                              width: 30,
-                              height: 30,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                isSelected ? Icons.check : Icons.sports,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.grey.shade700,
-                              ),
-                            ),
-                          )
-                        : Icon(
-                            isSelected ? Icons.check : Icons.sports,
-                            color: isSelected
-                                ? Colors.white
-                                : Colors.grey.shade700,
-                          ),
+                    child: Text(
+                      sport.name[0],
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   trailing: isSelected
                       ? IconButton(

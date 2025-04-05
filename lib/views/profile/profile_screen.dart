@@ -53,7 +53,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      // Récupérer l'utilisateur actuel
       final user = await _authRepository.getCurrentUser();
 
       if (user != null) {
@@ -61,7 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _user = user;
         });
 
-        // Récupérer tous les sports
         final allSports = await _sportUserRepository.getAllSports();
         final Map<int, SportModel> sportsMap = {};
         for (var sport in allSports) {
@@ -71,13 +69,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _sportsMap = sportsMap;
         });
 
-        // Charger les sports de l'utilisateur
         final userSports = await _sportUserRepository.getUserSports(user.id);
         setState(() {
           _userSports = userSports;
         });
 
-        // Charger les badges de l'utilisateur
         final userBadges = await _badgeRepository.getUserBadges(user.id);
         setState(() {
           _userBadges = userBadges;
@@ -137,15 +133,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final imageFile = File(pickedFile.path);
 
-      // Upload de l'image
       final photoUrl =
           await _imageService.uploadProfileImage(imageFile, _user!.id);
 
       if (photoUrl != null) {
-        // Mettre à jour le profil avec la nouvelle photo
         await _userRepository.updateUserProfile(_user!.id, {'photo': photoUrl});
 
-        // Mettre à jour l'utilisateur local
         setState(() {
           _user = _user!..photo = photoUrl;
         });
@@ -244,7 +237,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             : CustomScrollView(
                 slivers: [
-                  // AppBar flexible avec photo de profil
                   SliverAppBar(
                     expandedHeight: 215,
                     pinned: true,
@@ -276,7 +268,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       background: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // Background gradient
                           Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -291,7 +282,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          // Profile image
                           Padding(
                             padding: const EdgeInsets.only(bottom: 40),
                             child: Center(
@@ -351,7 +341,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          // Overlay gradient for better text readability
                           const Positioned(
                             bottom: 0,
                             left: 0,
@@ -374,11 +363,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
-
-                  // Content
                   SliverList(
                     delegate: SliverChildListDelegate([
-                      // Description
                       if (_user?.description != null &&
                           (_user?.description ?? '').isNotEmpty)
                         Container(
@@ -431,8 +417,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         ),
-
-                      // Statistics section
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -488,8 +472,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-
-                      // Sports Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -524,10 +506,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // Sports list
                       _userSports.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(16),
@@ -591,39 +570,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     padding: const EdgeInsets.all(16),
                                     child: Row(
                                       children: [
-                                        // Sport icon avec un fond blanc pour mieux ressortir
                                         Container(
-                                          padding: const EdgeInsets.all(12),
+                                          width: 50,
+                                          height: 50,
                                           decoration: BoxDecoration(
                                             color: Theme.of(context)
                                                 .primaryColor
-                                                .withOpacity(0),
+                                                .withOpacity(0.2),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: sport?.logo != null
-                                              ? Image.network(
-                                                  sport!.logo!,
-                                                  width: 60,
-                                                  height: 60,
-                                                  fit: BoxFit.contain,
-                                                  errorBuilder: (context, error,
-                                                      stackTrace) {
-                                                    return Icon(
-                                                      Icons.sports,
-                                                      color: Theme.of(context)
-                                                          .primaryColor,
-                                                      size: 50,
-                                                    );
-                                                  },
-                                                )
-                                              : Icon(
-                                                  Icons.sports,
-                                                  color: Theme.of(context)
-                                                      .primaryColor,
-                                                  size: 50,
-                                                ),
+                                          child: Center(
+                                            child: Text(
+                                              (sport?.name ?? 'S')[0],
+                                              style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .primaryColor,
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        // Sport details
                                         Expanded(
                                           child: Padding(
                                             padding: const EdgeInsets.symmetric(
@@ -701,7 +668,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ),
                                           ),
                                         ),
-                                        // Delete button sans fond blanc
                                         IconButton(
                                           icon:
                                               const Icon(Icons.delete_outline),
@@ -724,7 +690,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   TextButton(
                                                     onPressed: () {
                                                       Navigator.pop(context);
-                                                      // Pour la démo, recharger simplement les données
                                                       _loadUserData();
                                                     },
                                                     child: const Text(
@@ -744,8 +709,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
-
-                      // Badges Section
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -759,9 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       _userBadges.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(16),
@@ -825,7 +786,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     padding: const EdgeInsets.all(16),
                                     child: Row(
                                       children: [
-                                        // Badge icon/logo
                                         Container(
                                           padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
@@ -855,7 +815,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   size: 50),
                                         ),
                                         const SizedBox(width: 16),
-                                        // Badge details
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -894,8 +853,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                               },
                             ),
-
-                      // Informations personnelles
                       Container(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -924,7 +881,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceAround,
                                 children: [
-                                  // Pseudo
                                   Column(
                                     children: [
                                       Container(
@@ -957,8 +913,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-
-                                  // Date de naissance
                                   Column(
                                     children: [
                                       Container(
@@ -993,8 +947,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-
-                                  // Membre depuis
                                   Column(
                                     children: [
                                       Container(
@@ -1029,8 +981,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-
-                                  // Genre (si disponible)
                                   if (_user?.gender != null &&
                                       _user!.gender!.isNotEmpty)
                                     Column(
@@ -1070,8 +1020,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-
-                      // Settings section
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -1127,8 +1075,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-
-                      // Version
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
