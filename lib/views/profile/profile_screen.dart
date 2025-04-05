@@ -1,4 +1,3 @@
-// lib/views/profile/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,14 +8,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../../models/user_model.dart';
 import '../../models/sport_user_model.dart';
 import '../../models/sport_model.dart';
+import '../../models/badge_model.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/user_repository.dart';
-import '../../repositories/sport_repository.dart';
+import '../../repositories/sport_user_repository.dart';
+import '../../repositories/badge_repository.dart';
 import '../../services/image_service.dart';
-import '../../utils/test_data_initializer.dart';
 import 'edit_profile_screen.dart';
-import 'add_sport_screen.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'sport_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -28,13 +27,14 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authRepository = AuthRepository();
   final _userRepository = UserRepository();
-  final _sportRepository = SportRepository();
+  final _sportUserRepository = SportUserRepository();
+  final _badgeRepository = BadgeRepository();
   final _imageService = ImageService();
 
   UserModel? _user;
   List<SportUserModel> _userSports = [];
+  List<BadgeModel> _userBadges = [];
   Map<int, SportModel> _sportsMap = {};
-  List<Map<String, dynamic>> _userBadges = [];
   bool _isLoading = true;
   bool _isUploadingImage = false;
   String? _errorMessage;
@@ -53,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      // Récupérer l'utilisateur courant
+      // Récupérer l'utilisateur actuel
       final user = await _authRepository.getCurrentUser();
 
       if (user != null) {
@@ -61,30 +61,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _user = user;
         });
 
-        debugPrint(
-            'Utilisateur chargé: ${user.pseudo ?? "null"}, ID: ${user.id}');
-
-        // Récupérer les sports de l'utilisateur
-        final userSports = await _userRepository.getUserSports(user.id);
-        setState(() {
-          _userSports = userSports;
-        });
-
-        debugPrint('Sports chargés: ${userSports.length}');
-
-        // Récupérer tous les sports pour avoir les informations complètes
-        final allSports = await _sportRepository.getAllSports();
-
-        // Créer une map pour un accès rapide aux sports par id
+        // Récupérer tous les sports
+        final allSports = await _sportUserRepository.getAllSports();
         final Map<int, SportModel> sportsMap = {};
         for (var sport in allSports) {
           sportsMap[sport.id] = sport;
         }
-
-        await _loadUserBadges();
-
         setState(() {
           _sportsMap = sportsMap;
+        });
+
+        // Charger les sports de l'utilisateur
+        final userSports = await _sportUserRepository.getUserSports(user.id);
+        setState(() {
+          _userSports = userSports;
+        });
+
+        // Charger les badges de l'utilisateur
+        final userBadges = await _badgeRepository.getUserBadges(user.id);
+        setState(() {
+          _userBadges = userBadges;
         });
       } else {
         debugPrint('Aucun utilisateur connecté trouvé');
@@ -139,20 +135,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isUploadingImage = true;
       });
 
-      debugPrint('Image sélectionnée: ${pickedFile.path}');
       final imageFile = File(pickedFile.path);
 
       // Upload de l'image
       final photoUrl =
           await _imageService.uploadProfileImage(imageFile, _user!.id);
-      debugPrint('URL de la photo téléchargée: $photoUrl');
 
       if (photoUrl != null) {
         // Mettre à jour le profil avec la nouvelle photo
         await _userRepository.updateUserProfile(_user!.id, {'photo': photoUrl});
 
-        // Recharger les données du profil
-        await _loadUserData();
+        // Mettre à jour l'utilisateur local
+        setState(() {
+          _user = _user!..photo = photoUrl;
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -176,104 +172,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _removeSport(int sportId) async {
-    try {
-      await _sportRepository.removeSportFromUser(_user?.id ?? '', sportId);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sport supprimé avec succès')),
-      );
-
-      await _loadUserData();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: ${e.toString()}')),
-      );
-    }
-  }
-
-  Future<void> _loadUserBadges() async {
-    try {
-      final badges = await _userRepository.getUserBadges(_user!.id);
-      setState(() {
-        _userBadges = badges;
-      });
-    } catch (e) {
-      debugPrint('Erreur lors du chargement des badges: $e');
-    }
-  }
-
-  Future<void> _initializeTestData() async {
-    try {
-      // Afficher un indicateur de chargement
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Initialisation des données de test...'),
-              ],
-            ),
-          );
-        },
-      );
-
-      // Initialiser toutes les données de test
-      final result = await TestDataInitializer.initializeAllTestData();
-
-      // Fermer la boîte de dialogue
-      if (mounted) Navigator.pop(context);
-
-      // Afficher un message de succès ou d'erreur
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result
-                ? 'Données de test initialisées avec succès'
-                : 'Échec de l\'initialisation des données de test'),
-            backgroundColor: result ? Colors.green : Colors.red,
-          ),
-        );
-      }
-
-      // Recharger les données
-      if (result) {
-        await _loadUserData();
-      }
-    } catch (e) {
-      // Fermer la boîte de dialogue en cas d'erreur
-      if (mounted) Navigator.pop(context);
-
-      // Afficher l'erreur
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   String _getGenderText(String genderCode) {
     switch (genderCode) {
       case 'M':
-      case 'Male':
         return 'Homme';
       case 'F':
-      case 'Female':
         return 'Femme';
       case 'O':
-      case 'Other':
         return 'Autre';
       case 'U':
-      case 'No Answer':
         return 'Non précisé';
       default:
         return 'Non précisé';
@@ -386,7 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           // Profile image
                           Padding(
-                          padding: const EdgeInsets.only(bottom: 40), // Ajouter un padding en bas
+                            padding: const EdgeInsets.only(bottom: 40),
                             child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -423,11 +330,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           child: Container(
                                             padding: const EdgeInsets.all(4),
                                             decoration: BoxDecoration(
-                                              color:
-                                                  Theme.of(context).primaryColor,
+                                              color: Theme.of(context)
+                                                  .primaryColor,
                                               shape: BoxShape.circle,
                                               border: Border.all(
-                                                  color: Colors.white, width: 2),
+                                                  color: Colors.white,
+                                                  width: 2),
                                             ),
                                             child: const Icon(
                                               Icons.camera_alt,
@@ -439,7 +347,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ],
                                     ),
                                   ),
-                                  
                                 ],
                               ),
                             ),
@@ -525,7 +432,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
 
-
                       // Statistics section
                       Padding(
                         padding: const EdgeInsets.all(16),
@@ -565,15 +471,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   _buildStatCard(
                                     context,
                                     Icons.people,
-                                    '0',
+                                    '12',
                                     'Partenaires',
                                     Colors.green.shade200,
                                   ),
                                   _buildStatCard(
                                     context,
-                                    Icons.location_on,
-                                    '0',
-                                    'Lieux',
+                                    Icons.emoji_events,
+                                    '${_userBadges.length}',
+                                    'Badges',
                                     Colors.orange.shade200,
                                   ),
                                 ],
@@ -583,7 +489,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-      // Sports Section
+                      // Sports Section
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -600,7 +506,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        const AddSportScreen(),
+                                        const SportSelectionScreen(),
                                   ),
                                 );
                                 if (result == true) {
@@ -620,8 +526,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
 
                       const SizedBox(height: 8),
-                    
-             // Sports list
+
+                      // Sports list
                       _userSports.isEmpty
                           ? Padding(
                               padding: const EdgeInsets.all(16),
@@ -659,159 +565,187 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             )
-                         : ListView.builder( 
-                          padding: const EdgeInsets.all(16), 
-                          shrinkWrap: true, 
-                          physics: const NeverScrollableScrollPhysics(), 
-                          itemCount: _userSports.length, 
-                          itemBuilder: (context, index) { 
-                            final sportUser = _userSports[index]; 
-                            final sport = _sportsMap[sportUser.sportId];
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _userSports.length,
+                              itemBuilder: (context, index) {
+                                final sportUser = _userSports[index];
+                                final sport = _sportsMap[sportUser.sportId];
 
-						              return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.shade300,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                // Sport icon avec un fond blanc pour mieux ressortir
-                                Container(
-                                  padding: const EdgeInsets.all(12),
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor.withOpacity(0),
-                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.shade300,
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  child: sport?.logo != null
-                                ? Image.network(
-                                    sport!.logo!, 
-                                    width: 60,  // Taille plus grande
-                                    height: 60, 
-                                    fit: BoxFit.contain, // Ajuste sans bord blanc
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(
-                                        Icons.sports, 
-                                        color: Theme.of(context).primaryColor,
-                                        size: 50, // Icône de fallback plus grande
-                                      );
-                                    },
-                                  )
-                                : Icon(
-                                    Icons.sports, 
-                                    color: Theme.of(context).primaryColor,
-                                    size: 50, // Icône de fallback plus grande
-                                  ),
-                                ),
-                                // Sport details
-                                Expanded(
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    padding: const EdgeInsets.all(16),
+                                    child: Row(
                                       children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              sport?.name ?? 'Sport #${sportUser.sportId}',
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (sportUser.lookingForPartners) ...[
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2,
+                                        // Sport icon avec un fond blanc pour mieux ressortir
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .primaryColor
+                                                .withOpacity(0),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: sport?.logo != null
+                                              ? Image.network(
+                                                  sport!.logo!,
+                                                  width: 60,
+                                                  height: 60,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (context, error,
+                                                      stackTrace) {
+                                                    return Icon(
+                                                      Icons.sports,
+                                                      color: Theme.of(context)
+                                                          .primaryColor,
+                                                      size: 50,
+                                                    );
+                                                  },
+                                                )
+                                              : Icon(
+                                                  Icons.sports,
+                                                  color: Theme.of(context)
+                                                      .primaryColor,
+                                                  size: 50,
                                                 ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green.shade100,
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  'Recherche',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.green.shade800,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
                                         ),
-                                        if (sportUser.skillLevel != null) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Niveau : ${sportUser.skillLevel}',
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
+                                        // Sport details
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      sport?.name ??
+                                                          'Sport #${sportUser.sportId}',
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    if (sportUser
+                                                        .lookingForPartners) ...[
+                                                      const SizedBox(width: 8),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 2,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: Colors
+                                                              .green.shade100,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(12),
+                                                        ),
+                                                        child: Text(
+                                                          'Recherche',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors
+                                                                .green.shade800,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                if (sportUser.skillLevel !=
+                                                    null) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Niveau : ${sportUser.skillLevel}',
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                                if (sportUser.clubName !=
+                                                        null &&
+                                                    sportUser.clubName!
+                                                        .isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Club : ${sportUser.clubName}',
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                        if (sportUser.clubName != null && sportUser.clubName!.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Club : ${sportUser.clubName}',
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
+                                        ),
+                                        // Delete button sans fond blanc
+                                        IconButton(
+                                          icon:
+                                              const Icon(Icons.delete_outline),
+                                          color: Colors.red,
+                                          onPressed: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text(
+                                                    'Supprimer le sport'),
+                                                content: Text(
+                                                    'Êtes-vous sûr de vouloir supprimer ${sport?.name ?? "ce sport"} de votre profil?'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(context),
+                                                    child:
+                                                        const Text('Annuler'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.pop(context);
+                                                      // Pour la démo, recharger simplement les données
+                                                      _loadUserData();
+                                                    },
+                                                    child: const Text(
+                                                      'Supprimer',
+                                                      style: TextStyle(
+                                                          color: Colors.red),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
                                       ],
                                     ),
                                   ),
-                                ),
-                                // Delete button sans fond blanc
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  color: Colors.red,
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Supprimer le sport'),
-                                        content: Text(
-                                            'Êtes-vous sûr de vouloir supprimer ${sport?.name ?? "ce sport"} de votre profil?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context),
-                                            child: const Text('Annuler'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              _removeSport(sportUser.sportId);
-                                            },
-                                            child: const Text(
-                                              'Supprimer',
-                                              style: TextStyle(color: Colors.red),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
 
-                     
-                     // Badges Section
+                      // Badges Section
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -820,9 +754,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Text(
                               'Mes badges',
                               style: TextStyle(
-                                fontSize: 18, 
-                                fontWeight: FontWeight.bold
-                              ),
+                                  fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -874,12 +806,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: _userBadges.length,
                               itemBuilder: (context, index) {
-                                final badgeData = _userBadges[index];
-                                final badge = badgeData['badge'];
-                                final dateObtained = DateTime.parse(badgeData['date_obtained']);
+                                final badge = _userBadges[index];
 
                                 return Container(
-                                 margin: const EdgeInsets.only(bottom: 12),
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
@@ -904,32 +834,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 .withOpacity(0),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: badge['logo'] != null
-                                            ? Image.network(
-                                                badge['logo'], 
-                                                width: 60, 
-                                                height: 60, 
-                                                fit: BoxFit.contain,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Icon(
-                                                    Icons.emoji_events, 
-                                                    color: Theme.of(context).primaryColor
-                                                  );
-                                                },
-                                              )
-                                            : Icon(
-                                                Icons.emoji_events, 
-                                                color: Theme.of(context).primaryColor
-                                              ),
+                                          child: badge.logo != null
+                                              ? Image.network(
+                                                  badge.logo!,
+                                                  width: 60,
+                                                  height: 60,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (context, error,
+                                                      stackTrace) {
+                                                    return Icon(
+                                                        Icons.emoji_events,
+                                                        color: Theme.of(context)
+                                                            .primaryColor,
+                                                        size: 50);
+                                                  },
+                                                )
+                                              : Icon(Icons.emoji_events,
+                                                  color: Theme.of(context)
+                                                      .primaryColor,
+                                                  size: 50),
                                         ),
                                         const SizedBox(width: 16),
                                         // Badge details
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                badge['name'],
+                                                badge.name,
                                                 style: const TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.bold,
@@ -937,7 +870,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                badge['description'],
+                                                badge.description,
                                                 style: TextStyle(
                                                   color: Colors.grey.shade600,
                                                 ),
@@ -946,7 +879,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                'Obtenu le ${DateFormat('dd/MM/yyyy').format(dateObtained)}',
+                                                'Obtenu le ${DateFormat('dd/MM/yyyy').format(badge.dateObtained)}',
                                                 style: TextStyle(
                                                   color: Colors.grey.shade500,
                                                   fontSize: 12,
@@ -970,7 +903,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             const Text(
                               'Informations personnelles',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 12),
                             Container(
@@ -987,7 +921,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ],
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
                                 children: [
                                   // Pseudo
                                   Column(
@@ -1006,7 +941,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        '${_user?.firstName}',
+                                        '${_user?.firstName ?? "Non défini"}',
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -1022,7 +957,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-                                  
+
                                   // Date de naissance
                                   Column(
                                     children: [
@@ -1041,7 +976,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       const SizedBox(height: 8),
                                       Text(
                                         _user?.birthDate != null
-                                            ? DateFormat('dd/MM/yyyy').format(_user!.birthDate!)
+                                            ? DateFormat('dd/MM/yyyy')
+                                                .format(_user!.birthDate!)
                                             : '-',
                                         style: const TextStyle(
                                           fontSize: 14,
@@ -1057,7 +993,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-                                  
+
                                   // Membre depuis
                                   Column(
                                     children: [
@@ -1076,7 +1012,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       const SizedBox(height: 8),
                                       Text(
                                         _user?.inscriptionDate != null
-                                            ? DateFormat('dd/MM/yyyy').format(_user!.inscriptionDate!)
+                                            ? DateFormat('dd/MM/yyyy')
+                                                .format(_user!.inscriptionDate!)
                                             : '-',
                                         style: const TextStyle(
                                           fontSize: 14,
@@ -1092,9 +1029,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-                                  
+
                                   // Genre (si disponible)
-                                  if (_user?.gender != null && _user!.gender!.isNotEmpty)
+                                  if (_user?.gender != null &&
+                                      _user!.gender!.isNotEmpty)
                                     Column(
                                       children: [
                                         Container(
@@ -1183,18 +1121,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     title: const Text('Confidentialité'),
                                     onTap: () {},
                                   ),
-                                  const Divider(height: 1),
-                                  ListTile(
-                                    leading: Icon(
-                                      Icons.admin_panel_settings,
-                                      color: Colors.orange.shade700,
-                                    ),
-                                    title: const Text(
-                                        'Initialiser les données de test'),
-                                    subtitle: const Text(
-                                        'Crée des données fictives pour tester l\'application'),
-                                    onTap: _initializeTestData,
-                                  ),
                                 ],
                               ),
                             ),
@@ -1262,52 +1188,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-
-  Widget _buildInfoRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-    Color iconBgColor,
-  ) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: iconBgColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            color: iconBgColor.withOpacity(1.0),
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
-
